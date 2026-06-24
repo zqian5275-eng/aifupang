@@ -1,0 +1,1705 @@
+import requests
+import json
+import re
+import time
+import random
+import uuid
+import os
+import math
+from datetime import datetime, timedelta
+
+# Alpha Vantage 全局频率控制
+_AV_LAST_CALL = 0
+_AV_MIN_INTERVAL = 15  # demo key 最小间隔(秒)
+
+# ============ Tushare Pro 初始化 ============
+TUSHARE_TOKEN = os.environ.get('TUSHARE_TOKEN', '8c40fdd74c2af0322ddd94c079a7b92c6d9c150e6a339b51b936c5db')
+_ts_pro = None
+
+def get_ts_pro():
+    """懒加载Tushare Pro API"""
+    global _ts_pro
+    if _ts_pro is None:
+        try:
+            import tushare as ts
+            _ts_pro = ts.pro_api(TUSHARE_TOKEN)
+        except Exception as e:
+            print(f"[WARN] Tushare初始化失败: {e}")
+            _ts_pro = None
+    return _ts_pro
+
+
+def _to_ts_code(code):
+    """转换为Tushare代码格式: sh600519 -> 600519.SH"""
+    code_num = code[2:] if code.startswith(('sh', 'sz')) else code
+    suffix = 'SH' if code.startswith('sh') or (len(code_num) == 6 and code_num.startswith('6')) else 'SZ'
+    return f"{code_num}.{suffix}"
+
+
+def _to_standard_code(ts_code):
+    """Tushare代码转标准格式: 600519.SH -> sh600519"""
+    parts = ts_code.split('.')
+    if len(parts) == 2:
+        prefix = 'sh' if parts[1] == 'SH' else 'sz'
+        return f"{prefix}{parts[0]}"
+    return ts_code
+
+
+def _today_str():
+    return datetime.now().strftime('%Y%m%d')
+
+
+def _days_ago_str(days):
+    return (datetime.now() - timedelta(days=days)).strftime('%Y%m%d')
+
+
+# ============ 东财防封：全局节流 + 会话复用 ============
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
+
+EM_SESSION = requests.Session()
+EM_SESSION.headers.update({"User-Agent": UA})
+EM_MIN_INTERVAL = 1.0
+_em_last_call = [0.0]
+_EM_AVAILABLE = None
+
+def _check_em_available():
+    """快速检测东财API是否可达（2秒超时）"""
+    global _EM_AVAILABLE
+    if _EM_AVAILABLE is not None:
+        return _EM_AVAILABLE
+    try:
+        r = requests.get('https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=1&po=1&np=1&fltt=2&invt=2&fs=m:0+t:1&fields=f2', 
+                        headers={"User-Agent": UA}, timeout=2)
+        _EM_AVAILABLE = r.status_code == 200 and len(r.text) > 50
+    except Exception:
+        _EM_AVAILABLE = False
+    return _EM_AVAILABLE
+
+def em_get(url, params=None, headers=None, timeout=15, **kwargs):
+    """东财统一请求入口：自动节流 + 复用 session + 默认 UA"""
+    if not _check_em_available():
+        raise ConnectionError("东财API不可达，跳过")
+    wait = EM_MIN_INTERVAL - (time.time() - _em_last_call[0])
+    if wait > 0:
+        time.sleep(wait + random.uniform(0.1, 0.5))
+    try:
+        return EM_SESSION.get(url, params=params, headers=headers, timeout=timeout, **kwargs)
+    finally:
+        _em_last_call[0] = time.time()
+
+def eastmoney_datacenter(report_name, columns="ALL", filter_str="", page_size=50,
+                          sort_columns="", sort_types="-1") -> list:
+    """东财数据中心统一查询"""
+    if not _check_em_available():
+        raise ConnectionError("东财API不可达")
+    params = {
+        "reportName": report_name, "columns": columns,
+        "filter": filter_str, "pageNumber": "1", "pageSize": str(page_size),
+        "sortColumns": sort_columns, "sortTypes": sort_types,
+        "source": "WEB", "client": "WEB",
+    }
+    r = em_get(DATACENTER_URL, params=params, timeout=15)
+    d = r.json()
+    if d.get("result") and d["result"].get("data"):
+        return d["result"]["data"]
+    return []
+
+
+# ============ 1. 行情层 ============
+def parse_tencent_quote(code):
+    """腾讯财经实时行情"""
+    r = requests.get(f'https://qt.gtimg.cn/q={code}', timeout=10)
+    r.encoding = 'gbk'
+    f = r.text.split('~')
+    if len(f) < 50:
+        return None
+    return {
+        'name': f[1], 'code': f[2],
+        'current': float(f[3]) if f[3] else 0,
+        'yesterday_close': float(f[4]) if f[4] else 0,
+        'open': float(f[5]) if f[5] else 0,
+        'volume': float(f[6]) if f[6] else 0,
+        'amount': float(f[35].split('/')[-1]) if len(f) > 35 and f[35] else 0,
+        'turnover_rate': f[38] if len(f) > 38 else '0',
+        'change_pct': float(f[32]) if f[32] else 0,
+        'amplitude': float(f[43]) if len(f) > 43 and f[43] else 0,
+        'pe_ttm': float(f[39]) if len(f) > 39 and f[39] and f[39] != '' else 0,
+        'pe_static': float(f[52]) if len(f) > 52 and f[52] and f[52] != '' else 0,
+        'pb': float(f[46]) if len(f) > 46 and f[46] and f[46] != '' else 0,
+        'total_mv': f[44] if len(f) > 44 else '0',
+        'float_mv': f[45] if len(f) > 45 else '0',
+        'high': float(f[33]) if len(f) > 33 and f[33] else 0,
+        'low': float(f[34]) if len(f) > 34 and f[34] else 0,
+        'limit_up': float(f[47]) if len(f) > 47 and f[47] else 0,
+        'limit_down': float(f[48]) if len(f) > 48 and f[48] else 0,
+        'bid_prices': [], 'ask_prices': [], 'bid_volumes': []
+    }
+
+
+def get_kline(code, days=60, freq='day'):
+    """腾讯K线数据"""
+    try:
+        url = f'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={code},{freq},,,{days},qfq'
+        r = requests.get(url, timeout=15)
+        data = r.json()
+        stock_key = code.lower()
+        if stock_key not in data.get('data', {}):
+            return []
+        stock_data_inner = data['data'][stock_key]
+        klines_key = 'qfqday'
+        if klines_key not in stock_data_inner:
+            klines_key = 'day'
+        if klines_key not in stock_data_inner:
+            for key in stock_data_inner.keys():
+                if 'day' in key.lower() or 'kline' in key.lower():
+                    klines_key = key
+                    break
+        if klines_key not in stock_data_inner:
+            return []
+        klines = stock_data_inner[klines_key]
+        if not klines or not isinstance(klines, list):
+            return []
+        result = []
+        for k in klines[-days:]:
+            if isinstance(k, list) and len(k) >= 6:
+                result.append({
+                    'date': k[0], 'open': float(k[1]) if k[1] else 0,
+                    'close': float(k[2]) if k[2] else 0,
+                    'high': float(k[3]) if k[3] else 0,
+                    'low': float(k[4]) if k[4] else 0,
+                    'volume': float(k[5]) if k[5] else 0
+                })
+        return result
+    except Exception as e:
+        print(f"[WARN] K线获取失败: {e}")
+        return []
+
+
+# ============ 2. 板块归属 ============
+def get_sectors(code):
+    """个股所属板块/概念归属（东财 slist）"""
+    code_num = code[2:] if code.startswith('sh') or code.startswith('sz') else code
+    market_code = 1 if code.startswith('sh') else 0
+    params = {
+        "fltt": "2", "invt": "2",
+        "secid": f"{market_code}.{code_num}",
+        "spt": "3", "pi": "0", "pz": "200", "po": "1",
+        "fields": "f12,f14,f3,f128",
+    }
+    headers = {"User-Agent": UA, "Referer": "https://quote.eastmoney.com/"}
+    try:
+        if not _check_em_available():
+            raise ConnectionError("东财API不可达")
+        r = em_get("https://push2.eastmoney.com/api/qt/slist/get", params=params, headers=headers, timeout=15)
+        d = r.json()
+    except Exception as e:
+        print(f"[WARN] 板块归属请求失败: {e}")
+    
+    # 东财失败，用Tushare备选
+    result = []
+    try:
+        pro = get_ts_pro()
+        if pro:
+            ts_code = _to_ts_code(code)
+            # 获取股票名称和行业
+            df = pro.stock_basic(ts_code=ts_code, fields='ts_code,name,industry')
+            if df is not None and not df.empty:
+                row = df.iloc[0]
+                industry = row.get('industry', '')
+                stock_name = row.get('name', '')
+                if industry:
+                    # tushare的行业分类与趋势数据不一致，尝试模糊匹配行业涨跌
+                    sector_change = 0
+                    try:
+                        trends = get_sector_trend()
+                        # 模糊匹配：包含关键词即可
+                        for t in trends:
+                            tname = t.get('name', '')
+                            if tname == industry or industry in tname or tname in industry:
+                                sector_change = t.get('change_pct', 0)
+                                break
+                        # 仍然没匹配到，用股票自身涨跌作为板块参考
+                        if sector_change == 0 and industry:
+                            try:
+                                q = parse_tencent_quote(code)
+                                if q and q.get('change_pct'):
+                                    sector_change = q['change_pct']
+                            except:
+                                pass
+                    except:
+                        pass
+                    result.append({
+                        'name': industry, 'code': ts_code,
+                        'change_pct': round(sector_change if sector_change else 0, 2),
+                        'lead_stock': stock_name,
+                        'type': '行业'
+                    })
+
+    except Exception as e:
+        print(f"[WARN] Tushare板块信息也失败: {e}")
+    
+    return result
+
+
+# ============ 3. 估值层 ============
+# 研报缓存（避免Tushare频率限制）
+_RATING_CACHE = {}
+_RATING_CACHE_TIME = 0
+
+def _get_cached_ratings(ts_code):
+    """获取缓存的研报数据"""
+    global _RATING_CACHE, _RATING_CACHE_TIME
+    # 缓存1小时
+    if time.time() - _RATING_CACHE_TIME < 3600 and ts_code in _RATING_CACHE:
+        return _RATING_CACHE[ts_code]
+    return None
+
+def _set_cached_ratings(ts_code, data):
+    """设置研报缓存"""
+    global _RATING_CACHE, _RATING_CACHE_TIME
+    _RATING_CACHE[ts_code] = data
+    _RATING_CACHE_TIME = time.time()
+
+
+def get_valuation(code):
+    """估值数据：研报评级、EPS预测、PE/PB/市值 - 东财为主，Tushare备选"""
+    code_num = code[2:] if code.startswith('sh') or code.startswith('sz') else code
+    ts_code = _to_ts_code(code)
+    ratings = []
+    
+    # 先尝试东财研报
+    try:
+        data = eastmoney_datacenter(
+            "RPT_LONERATING_DETAIL",
+            filter_str=f'(SECURITY_CODE="{code_num}")',
+            page_size=30, sort_columns="REPORT_DATE", sort_types="-1"
+        )
+        for item in data:
+            ratings.append({
+                'date': str(item.get('REPORT_DATE', ''))[:10],
+                'type': item.get('RATING_TYPE', ''),
+                'analyst': item.get('ANALYST_NAME', ''),
+                'original': item.get('ORIGINAL_RATING', ''),
+                'new': item.get('NEW_RATING', ''),
+                'change': item.get('CHANGE_TYPE', '')
+            })
+    except Exception as e:
+        print(f"[WARN] 东财报研获取失败: {e}")
+    
+    # 东财失败或无数据，用Tushare report_rc（带缓存）
+    if not ratings:
+        cached = _get_cached_ratings(ts_code)
+        if cached is not None:
+            ratings = cached
+        else:
+            try:
+                pro = get_ts_pro()
+                if pro:
+                    start_date = _days_ago_str(365)
+                    end_date = _today_str()
+                    df = pro.report_rc(ts_code=ts_code, start_date=start_date, end_date=end_date)
+                    if df is not None and not df.empty:
+                        for _, row in df.iterrows():
+                            rating_map = {
+                                'Buy': '买入', 'Strong Buy': '强烈买入',
+                                'Hold': '持有', 'Sell': '卖出',
+                                'Neutral': '中性', 'Outperform': '跑赢大市',
+                                'Underperform': '跑输大市'
+                            }
+                            raw = row.get('rating') if hasattr(row, 'get') else (row.rating if hasattr(row, 'rating') else '')
+                            rating = rating_map.get(raw, raw)
+                            date_str = ''
+                            try:
+                                d = row.get('report_date') if hasattr(row, 'get') else row.report_date
+                                date_str = str(d)[:10] if d else ''
+                            except:
+                                pass
+                            analyst = ''
+                            try:
+                                a = row.get('author_name') if hasattr(row, 'get') else (row.author_name if hasattr(row, 'author_name') else '')
+                                analyst = str(a) if a else ''
+                            except:
+                                pass
+                            ratings.append({
+                                'date': date_str,
+                                'type': '',
+                                'analyst': analyst,
+                                'original': '',
+                                'new': rating,
+                                'change': ''
+                            })
+                        _set_cached_ratings(ts_code, ratings)
+            except Exception as e:
+                print(f"[WARN] Tushare研报获取失败: {e}")
+
+    eps_data = []
+    try:
+        data = eastmoney_datacenter(
+            "RPT_REPORTAPI_PREDICT",
+            filter_str=f'(SECURITY_CODE="{code_num}")',
+            page_size=10, sort_columns="PUBLISH_DATE", sort_types="-1"
+        )
+        for item in data:
+            eps_data.append({
+                'year': str(item.get('PUBLISH_DATE', ''))[:10],
+                'eps_forecast': item.get('predictThisYearEps', ''),
+                'eps_last_year': item.get('predictNextYearEps', '')
+            })
+    except Exception as e:
+        print(f"[WARN] EPS预测获取失败: {e}")
+    
+    # EPS预测为空时，用Tushare财务指标备选（最近8个季度）
+    if not eps_data:
+        try:
+            pro = get_ts_pro()
+            if pro:
+                from datetime import datetime as _dt
+                # 查询最近8个季度
+                year = _dt.now().year
+                month = _dt.now().month
+                # 确定最新已出报表的季度
+                if month <= 4:
+                    latest_q_end = f"{year-1}1231"
+                elif month <= 8:
+                    latest_q_end = f"{year}0331"
+                elif month <= 10:
+                    latest_q_end = f"{year}0630"
+                else:
+                    latest_q_end = f"{year}0930"
+                
+                periods = []
+                y = int(latest_q_end[:4])
+                m = int(latest_q_end[4:6])
+                for _ in range(8):
+                    periods.append(f"{y}{m:02d}01" if m != 12 else f"{y}1231")
+                    m -= 3
+                    if m <= 0:
+                        m = 12
+                        y -= 1
+                
+                for p in periods:
+                    try:
+                        df = pro.fina_indicator(ts_code=ts_code, period=p)
+                        if df is not None and not df.empty:
+                            r = df.iloc[0]
+                            eps_data.append({
+                                'year': f"{int(p[:4])}-{int(p[4:6]):02d}",
+                                'eps_forecast': float(r.eps) if hasattr(r, 'eps') and r.eps else '',
+                                'eps_last_year': float(r.dt_eps) if hasattr(r, 'dt_eps') and r.dt_eps else ''
+                            })
+                    except:
+                        continue
+        except Exception as e:
+            print(f"[WARN] Tushare财务指标获取失败: {e}")
+    
+    # 获取最新估值指标（PE/PB/市值等）
+    valuation_metrics = {}
+    try:
+        pro = get_ts_pro()
+        if pro:
+            trade_date = _days_ago_str(1)
+            df = pro.daily_basic(ts_code=ts_code, trade_date=trade_date)
+            if df is not None and not df.empty:
+                r = df.iloc[0]
+                valuation_metrics = {
+                    'pe': float(r.pe) if hasattr(r, 'pe') and r.pe and str(r.pe) != 'nan' else 0,
+                    'pe_ttm': float(r.pe_ttm) if hasattr(r, 'pe_ttm') and r.pe_ttm and str(r.pe_ttm) != 'nan' else 0,
+                    'pb': float(r.pb) if hasattr(r, 'pb') and r.pb and str(r.pb) != 'nan' else 0,
+                    'ps': float(r.ps) if hasattr(r, 'ps') and r.ps and str(r.ps) != 'nan' else 0,
+                    'dv_ratio': float(r.dv_ratio) if hasattr(r, 'dv_ratio') and r.dv_ratio and str(r.dv_ratio) != 'nan' else 0,
+                    'total_mv': float(r.total_mv) if hasattr(r, 'total_mv') and r.total_mv and str(r.total_mv) != 'nan' else 0,
+                    'circ_mv': float(r.circ_mv) if hasattr(r, 'circ_mv') and r.circ_mv and str(r.circ_mv) != 'nan' else 0,
+                    'turnover_rate': float(r.turnover_rate) if hasattr(r, 'turnover_rate') and r.turnover_rate and str(r.turnover_rate) != 'nan' else 0,
+                }
+    except Exception as e:
+        print(f"[WARN] Tushare估值指标获取失败: {e}")
+
+    return {
+        'code': code, 'ratings': ratings, 'eps_forecasts': eps_data,
+        'rating_summary': _summarize_ratings(ratings),
+        'valuation_metrics': valuation_metrics
+    }
+
+def _summarize_ratings(ratings):
+    if not ratings:
+        return {'count': 0}
+    buy_keywords = ['买入', '强烈买入', '跑赢大市', 'Outperform', 'Buy', 'Strong Buy']
+    buy_count = sum(1 for r in ratings if any(k in str(r.get('new', '')) for k in buy_keywords))
+    return {'count': len(ratings), 'buy_count': buy_count, 'last_date': ratings[0].get('date', '') if ratings else ''}
+
+
+# ============ 4. 信号层 ============
+def get_hot_stocks():
+    """热点强势股：同花顺涨停股 + 东财涨幅榜备选"""
+    result = []
+    
+    # 先尝试同花顺涨停股（有原因说明）
+    try:
+        from datetime import date as _date
+        date_str = _date.today().strftime("%Y-%m-%d")
+        url = f"http://zx.10jqka.com.cn/event/api/getharden/date/{date_str}/orderby/date/orderway/desc/charset/GBK/"
+        headers = {"User-Agent": UA}
+        r = requests.get(url, headers=headers, timeout=10)
+        data = r.json()
+        if data.get("errocode", 0) == 0:
+            rows = data.get("data") or []
+            for item in rows[:20]:
+                result.append({
+                    'code': item.get('code', ''), 'name': item.get('name', ''),
+                    'change_pct': 10.0,  # 涨停股默认10%
+                    'turnover': '',
+                    'reason': item.get('reason', '涨停')
+                })
+            if result:
+                return result
+    except Exception as e:
+        print(f"[WARN] 同花顺热点股获取失败: {e}")
+    
+    # 同花顺失败，用东财涨幅榜备选
+    try:
+        url = "https://push2.eastmoney.com/api/qt/clist/get"
+        params = {
+            "pn": "1", "pz": "50", "po": "1", "np": "1",
+            "fltt": "2", "invt": "2",
+            "fs": "m:0+t:6,m:1+t:2",
+            "fields": "f2,f3,f12,f14,f20,f21",
+            "fid": "f3"
+        }
+        headers = {"User-Agent": UA, "Referer": "https://quote.eastmoney.com/"}
+        r = requests.get(url, params=params, headers=headers, timeout=15)
+        d = r.json()
+        items = d.get("data", {}).get("diff", [])
+        for item in items[:20]:
+            change = float(item.get("f3", 0) or 0)
+            result.append({
+                'code': item.get("f12", ""), 'name': item.get("f14", ""),
+                'change_pct': round(change, 2),
+                'turnover': '',
+                'reason': '涨幅榜'
+            })
+        return result
+    except Exception as e:
+        print(f"[WARN] 东财涨幅榜也失败: {e}")
+    
+    return result
+
+
+def get_northbound():
+    """北向资金 - 使用同花顺 hsgtApi"""
+    try:
+        url = "https://data.hexin.cn/market/hsgtApi/method/dayChart/"
+        headers = {
+            "User-Agent": UA, "Host": "data.hexin.cn",
+            "Referer": "https://data.hexin.cn/",
+        }
+        r = requests.get(url, headers=headers, timeout=10)
+        d = r.json()
+        times = d.get("time", [])
+        hgt = d.get("hgt", [])
+        sgt = d.get("sgt", [])
+        flows = []
+        for i in range(len(times)):
+            flows.append({
+                'date': times[i],
+                'north_net': float(hgt[i]) if i < len(hgt) and hgt[i] else 0,
+                'south_net': float(sgt[i]) if i < len(sgt) and sgt[i] else 0,
+                'total_net': (float(hgt[i]) if i < len(hgt) and hgt[i] else 0) +
+                             (float(sgt[i]) if i < len(sgt) and sgt[i] else 0)
+            })
+        return flows
+    except Exception as e:
+        print(f"[WARN] 北向资金获取失败: {e}")
+        return []
+
+
+def get_dragon_tiger():
+    """全市场龙虎榜 - 东财为主，Tushare备选"""
+    try:
+        if _check_em_available():
+            data = eastmoney_datacenter(
+                "RPT_DAILYBILLBOARD_DETAILSNEW",
+                page_size=50, sort_columns="TRADE_DATE", sort_types="-1"
+            )
+            if data:
+                result = []
+                for item in data[:20]:
+                    result.append({
+                        'date': str(item.get('TRADE_DATE', ''))[:10],
+                        'code': item.get('SECURITY_CODE', ''),
+                        'name': item.get('SECURITY_NAME_ABBR', ''),
+                        'close': float(item.get('CLOSE_PRICE', 0) or 0),
+                        'change_pct': float(item.get('CHANGE_RATE', 0) or 0),
+                        'turnover': float(item.get('TURNOVERRATE', 0) or 0),
+                        'amount': float(item.get('BILLBOARD_AMT', 0) or 0),
+                        'reason': item.get('EXPLANATION', '')
+                    })
+                return result
+    except Exception as e:
+        print(f"[WARN] 东财龙虎榜获取失败: {e}")
+    
+    # Tushare备选
+    result = []
+    try:
+        from datetime import date
+        pro = get_ts_pro()
+        if pro:
+            trade_date = date.today().strftime('%Y%m%d')
+            # 尝试最近几个交易日
+            for offset in range(5):
+                try:
+                    d = (date.today() - __import__('datetime').timedelta(days=offset)).strftime('%Y%m%d')
+                    df = pro.top_list(trade_date=d)
+                    if df is not None and not df.empty:
+                        for _, row in df.head(20).iterrows():
+                            result.append({
+                                'date': str(row.get('trade_date', ''))[:10],
+                                'code': row.get('ts_code', '').replace('.SH','').replace('.SZ',''),
+                                'name': row.get('name', ''),
+                                'close': float(row.get('close', 0) or 0),
+                                'change_pct': float(row.get('pct_change', 0) or 0),
+                                'turnover': float(row.get('turnover_rate', 0) or 0),
+                                'amount': float(row.get('amount', 0) or 0),
+                                'reason': row.get('reason', '')
+                            })
+                        break
+                except:
+                    continue
+    except Exception as e:
+        print(f"[WARN] Tushare龙虎榜也失败: {e}")
+    
+    return result
+
+
+def get_restriction_alert(code):
+    """限售解禁日历 - 东财为主，Tushare备选"""
+    code_num = code[2:] if code.startswith('sh') or code.startswith('sz') else code
+    try:
+        if _check_em_available():
+            data = eastmoney_datacenter(
+                "RPT_LIFT_STAGE",
+                filter_str=f'(SECURITY_CODE="{code_num}")',
+                page_size=20, sort_columns="FREE_DATE", sort_types="1"
+            )
+            if data:
+                result = []
+                for item in data:
+                    result.append({
+                        'date': str(item.get('FREE_DATE', ''))[:10],
+                        'type': item.get('LIMITED_STOCK_TYPE', ''),
+                        'shareholder': item.get('HOLDER_NAME', ''),
+                        'share_count': float(item.get('FREE_SHARES_NUM', 0) or 0),
+                        'ratio': item.get('FREE_RATIO', 0)
+                    })
+                return result
+    except Exception as e:
+        print(f"[WARN] 东财解禁获取失败: {e}")
+    
+    # Tushare备选
+    result = []
+    try:
+        pro = get_ts_pro()
+        if pro:
+            ts_code = _to_ts_code(code)
+            df = pro.share_float(ts_code=ts_code)
+            if df is not None and not df.empty:
+                df = df.sort_values('float_date', ascending=True)
+                for _, row in df.head(20).iterrows():
+                    result.append({
+                        'date': str(row.get('float_date', ''))[:10],
+                        'type': row.get('share_type', ''),
+                        'shareholder': row.get('holder_name', ''),
+                        'share_count': float(row.get('float_share', 0) or 0),
+                        'ratio': float(row.get('float_ratio', 0) or 0)
+                    })
+    except Exception as e:
+        print(f"[WARN] Tushare解禁也失败: {e}")
+    
+    return result
+
+
+def get_block_trade(code):
+    """大宗交易 - 东财为主，Tushare备选"""
+    code_num = code[2:] if code.startswith('sh') or code.startswith('sz') else code
+    try:
+        if _check_em_available():
+            data = eastmoney_datacenter(
+                "RPT_DATA_BLOCKTRADE",
+                filter_str=f'(SECURITY_CODE="{code_num}")',
+                page_size=20, sort_columns="TRADE_DATE", sort_types="-1"
+            )
+            if data:
+                result = []
+                for item in data:
+                    close = item.get("CLOSE_PRICE") or 0
+                    deal_price = item.get("DEAL_PRICE") or 0
+                    premium = ((deal_price / close - 1) * 100) if close else 0
+                    result.append({
+                        'date': str(item.get('TRADE_DATE', ''))[:10],
+                        'price': deal_price, 'close': close,
+                        'premium_pct': round(premium, 2),
+                        'volume': item.get('DEAL_VOLUME', 0),
+                        'amount': item.get('DEAL_AMT', 0),
+                        'buyer': item.get('BUYER_NAME', ''),
+                        'seller': item.get('SELLER_NAME', '')
+                    })
+                return result
+    except Exception as e:
+        print(f"[WARN] 东财大宗交易获取失败: {e}")
+    
+    # Tushare备选
+    result = []
+    try:
+        pro = get_ts_pro()
+        if pro:
+            ts_code = _to_ts_code(code)
+            df = pro.block_trade(ts_code=ts_code)
+            if df is not None and not df.empty:
+                df = df.sort_values('trade_date', ascending=False)
+                for _, row in df.head(20).iterrows():
+                    price = float(row.get('price', 0) or 0)
+                    vol = float(row.get('vol', 0) or 0)
+                    amt = float(row.get('amount', 0) or 0)
+                    result.append({
+                        'date': str(row.get('trade_date', ''))[:10],
+                        'price': price, 'close': 0,
+                        'premium_pct': 0,
+                        'volume': vol,
+                        'amount': amt,
+                        'buyer': row.get('buyer', ''),
+                        'seller': row.get('seller', '')
+                    })
+    except Exception as e:
+        print(f"[WARN] Tushare大宗交易也失败: {e}")
+    
+    return result
+
+
+def get_sector_trend():
+    """行业板块排名 - 东财为主，Tushare备选"""
+    result = []
+    
+    # 先尝试东财
+    try:
+        url = "https://push2.eastmoney.com/api/qt/clist/get"
+        params = {
+            "pn": "1", "pz": "100", "po": "1", "np": "1",
+            "fltt": "2", "invt": "2",
+            "fs": "m:90+t:2",
+            "fields": "f2,f3,f4,f12,f13,f14,f104,f105,f128,f136,f140,f141,f207",
+        }
+        headers = {"User-Agent": UA}
+        r = requests.get(url, params=params, headers=headers, timeout=15)
+        d = r.json()
+        items = d.get("data", {}).get("diff", [])
+        for i, item in enumerate(items[:30]):
+            result.append({
+                'rank': i + 1, 'name': item.get("f14", ""),
+                'change_pct': float(item.get("f3", 0) or 0),
+                'code': item.get("f12", ""),
+                'up_count': item.get("f104", 0),
+                'down_count': item.get("f105", 0),
+                'leader': item.get("f140", ""),
+                'leader_change': item.get("f136", 0),
+            })
+        if result:
+            return result
+    except Exception as e:
+        print(f"[WARN] 东财行业趋势失败，尝试Tushare: {e}")
+    
+    # 东财失败，用Tushare备选
+    try:
+        pro = get_ts_pro()
+        if pro:
+            # 尝试最近5个自然日，确保拿到有效交易日数据
+            df = None
+            trade_date = None
+            for d in range(1, 6):
+                try_date = _days_ago_str(d)
+                try_df = pro.daily_basic(trade_date=try_date, fields='ts_code,close,pe,pb,total_mv')
+                if try_df is not None and not try_df.empty and len(try_df) > 100:
+                    df = try_df
+                    trade_date = try_date
+                    break
+            if df is None or df.empty:
+                return result
+            # daily_basic 没有 industry 和 pct_chg，需要单独获取
+            if df is not None and not df.empty:
+                # 获取股票列表补充行业信息
+                try:
+                    stocks = pro.stock_basic(exchange='', list_status='L', fields='ts_code,industry')
+                    if stocks is not None and not stocks.empty:
+                        df = df.merge(stocks[['ts_code', 'industry']], on='ts_code', how='left')
+                except Exception:
+                    pass
+                # 获取涨跌幅（用 daily 接口）
+                try:
+                    daily_df = pro.daily(trade_date=trade_date, fields='ts_code,pct_chg')
+                    if daily_df is not None and not daily_df.empty:
+                        df = df.merge(daily_df[['ts_code', 'pct_chg']], on='ts_code', how='left')
+                except Exception:
+                    pass
+                # 过滤掉没有行业的
+                df = df[df['industry'].notna() & (df['industry'] != '')]
+                if not df.empty:
+                    # 按行业聚合
+                    industry_groups = df.groupby('industry').agg({
+                        'pct_chg': 'mean',
+                        'ts_code': 'count',
+                        'total_mv': 'sum'
+                    }).reset_index()
+                    industry_groups.columns = ['name', 'change_pct', 'stock_count', 'total_mv']
+                    industry_groups = industry_groups.sort_values('change_pct', ascending=False)
+                    for i, (_, row) in enumerate(industry_groups.head(30).iterrows()):
+                        result.append({
+                            'rank': i + 1, 'name': row['name'] or '其他',
+                            'change_pct': round(float(row['change_pct'] or 0), 2),
+                            'code': '', 'up_count': 0, 'down_count': 0,
+                            'leader': '', 'leader_change': 0
+                        })
+    except Exception as e:
+        print(f"[WARN] Tushare行业趋势也失败: {e}")
+    
+    return result
+
+
+# ============ 5. 资金面 ============
+def get_fund_flow(code, days=10):
+    """个股资金流向（日级）- 东财为主，Tushare备选"""
+    code_num = code[2:] if code.startswith('sh') or code.startswith('sz') else code
+    market_code = 1 if code.startswith('sh') else 0
+    flows = []
+
+    # 先尝试东财 - 使用akshare最新API
+    try:
+        if not _check_em_available():
+            raise ConnectionError("东财API不可达，直接走Tushare")
+        url = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
+        params = {
+            "secid": f"{market_code}.{code_num}",
+            "fields1": "f1,f2,f3,f7",
+            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65",
+            "klt": "101",
+            "lmt": "0",  # 0表示获取全部历史数据
+            "ut": "b2884a393a59ad64002292a3e90d46a5",
+            "_": int(time.time() * 1000),
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://data.eastmoney.com/zjlx/detail.html",
+        }
+        r = requests.get(url, params=params, headers=headers, timeout=15)
+        d = r.json()
+        klines = d.get("data", {}).get("klines", [])
+        print(f"[DEBUG] 东财资金流向获取到 {len(klines)} 条数据")
+        for line in klines:
+            parts = line.split(",")
+            if len(parts) >= 7:
+                flows.append({
+                    'date': parts[0],
+                    'main_net': float(parts[1]) if parts[1] != "-" else 0,
+                    'small_net': float(parts[2]) if parts[2] != "-" else 0,
+                    'mid_net': float(parts[3]) if parts[3] != "-" else 0,
+                    'large_net': float(parts[4]) if parts[4] != "-" else 0,
+                    'super_net': float(parts[5]) if parts[5] != "-" else 0,
+                })
+        if flows:
+            # 按日期升序排列，确保最新日期在最后
+            flows.sort(key=lambda x: x['date'])
+            # 只取最新的days条
+            flows = flows[-days:]
+            print(f"[DEBUG] 东财资金流向返回最新日期: {flows[-1]['date'] if flows else 'none'}")
+            return flows
+    except Exception as e:
+        print(f"[WARN] 东财资金流向失败，尝试Tushare: {e}")
+
+    # 东财失败，用Tushare备选
+    try:
+        pro = get_ts_pro()
+        if pro:
+            ts_code = _to_ts_code(code)
+            # 扩大查询范围到最近90天，确保能拿到最新数据
+            start_date = _days_ago_str(90)
+            end_date = _today_str()
+            df = pro.moneyflow(ts_code=ts_code, start_date=start_date, end_date=end_date)
+            if df is not None and not df.empty:
+                # 按日期升序排列
+                df = df.sort_values('trade_date', ascending=True)
+                for _, row in df.iterrows():
+                    flows.append({
+                        'date': row['trade_date'],
+                        'main_net': float(row.get('net_mf_amount', 0)),
+                        'small_net': float(row.get('sell_sm_amount', 0)) - float(row.get('buy_sm_amount', 0)),
+                        'mid_net': float(row.get('sell_md_amount', 0)) - float(row.get('buy_md_amount', 0)),
+                        'large_net': float(row.get('sell_lg_amount', 0)) - float(row.get('buy_lg_amount', 0)),
+                        'super_net': float(row.get('sell_elg_amount', 0)) - float(row.get('buy_elg_amount', 0)),
+                    })
+                # 只取最新的days条
+                flows = flows[-days:]
+                print(f"[DEBUG] Tushare资金流向返回最新日期: {flows[-1]['date'] if flows else 'none'}")
+    except Exception as e:
+        print(f"[WARN] Tushare资金流向也失败: {e}")
+
+    return flows
+
+
+def get_fund_flow_120d(code):
+    """个股资金流（日级，最近120个交易日）"""
+    return get_fund_flow(code, days=120)
+
+
+def get_margin_data(code):
+    """融资融券明细 - 东财为主，Tushare备选"""
+    code_num = code[2:] if code.startswith('sh') or code.startswith('sz') else code
+    try:
+        if _check_em_available():
+            data = eastmoney_datacenter(
+                "RPTA_WEB_RZRQ_GGMX",
+                filter_str=f'(SCODE="{code_num}")',
+                page_size=30, sort_columns="DATE", sort_types="-1"
+            )
+            result = []
+            for row in data:
+                result.append({
+                    'date': str(row.get('DATE', ''))[:10],
+                    'margin_balance': float(row.get('RZYE', 0) or 0),
+                    'sell_volume': float(row.get('RQYE', 0) or 0),
+                    'buy_repay': float(row.get('RZMRE', 0) or 0),
+                    'margin_repay': float(row.get('RQYL', 0) or 0),
+                    'balance_change': float(row.get('RZJME', 0) or 0)
+                })
+            if result:
+                return result
+    except Exception as e:
+        print(f"[WARN] 东财融资融券获取失败: {e}")
+    
+    # Tushare备选
+    result = []
+    try:
+        pro = get_ts_pro()
+        if pro:
+            ts_code = _to_ts_code(code)
+            start_date = _days_ago_str(30)
+            end_date = _today_str()
+            df = pro.margin_detail(ts_code=ts_code, start_date=start_date, end_date=end_date)
+            if df is not None and not df.empty:
+                df = df.sort_values('trade_date', ascending=False)
+                for _, row in df.head(30).iterrows():
+                    result.append({
+                        'date': str(row.get('trade_date', ''))[:10],
+                        'margin_balance': float(row.get('rzye', 0) or 0),
+                        'sell_volume': float(row.get('rqye', 0) or 0),
+                        'buy_repay': float(row.get('rzmre', 0) or 0),
+                        'margin_repay': float(row.get('rqyl', 0) or 0),
+                        'balance_change': float(row.get('rzjme', 0) or 0)
+                    })
+    except Exception as e:
+        print(f"[WARN] Tushare融资融券也失败: {e}")
+    
+    return result
+
+
+# ============ 6. 新闻 & 公告 ============
+def get_individual_news(code):
+    """个股新闻 - 东财为主，Tushare重大公告备选"""
+    code_num = code[2:] if code.startswith('sh') or code.startswith('sz') else code
+    rows = []
+    
+    # 先尝试东财（search-api-web 子域名未被封）
+    try:
+        cb = "jQuery_news"
+        url = "https://search-api-web.eastmoney.com/search/jsonp"
+        inner_params = json.dumps({
+            "uid": "", "keyword": code_num,
+            "type": ["cmsArticleWebOld"],
+            "client": "web", "clientType": "web", "clientVersion": "curr",
+            "param": {"cmsArticleWebOld": {"searchScope": "default", "sort": "default",
+                      "pageIndex": 1, "pageSize": 20, "preTag": "", "postTag": ""}},
+        }, separators=(',', ':'))
+        params = {"cb": cb, "param": inner_params}
+        headers = {"User-Agent": UA, "Referer": "https://so.eastmoney.com/"}
+        r = requests.get(url, params=params, headers=headers, timeout=15)
+        text = r.text
+        json_str = text[text.index("(") + 1 : text.rindex(")")]
+        d = json.loads(json_str)
+        articles = d.get("result", {}).get("cmsArticleWebOld", []) or []
+        for a in articles:
+            rows.append({
+                'title': re.sub(r'<[^>]+>', '', a.get("title", "")),
+                'time': a.get("date", ""),
+                'media': a.get("mediaName", ""),
+                'summary': re.sub(r'<[^>]+>', '', a.get("content", ""))[:200],
+                'url': a.get("url", "")
+            })
+        if rows:
+            return rows
+    except Exception as e:
+        print(f"[WARN] 东财新闻失败，尝试Tushare: {e}")
+    
+    # 东财失败，用Tushare重大公告备选
+    try:
+        pro = get_ts_pro()
+        if pro:
+            ts_code = _to_ts_code(code)
+            start_date = _days_ago_str(30)
+            end_date = _today_str()
+            # 尝试获取重大合同、业绩快报等
+            df = pro.major_news(ts_code=ts_code, start_date=start_date, end_date=end_date)
+            if df is not None and not df.empty:
+                for _, row in df.iterrows():
+                    rows.append({
+                        'title': row.get('title', ''),
+                        'time': row.get('date', ''),
+                        'media': 'Tushare',
+                        'summary': row.get('content', '')[:200],
+                        'url': ''
+                    })
+    except Exception as e:
+        print(f"[WARN] Tushare新闻也失败: {e}")
+    
+    return rows
+
+
+def get_global_news():
+    """东财全球资讯（7x24）"""
+    try:
+        if not _check_em_available():
+            return []
+        url = "https://np-weblist.eastmoney.com/comm/web/getFastNewsList"
+        params = {
+            "client": "web", "biz": "web_724",
+            "fastColumn": "102", "sortEnd": "",
+            "pageSize": "50",
+            "req_trace": str(uuid.uuid4()),
+        }
+        headers = {"User-Agent": UA, "Referer": "https://kuaixun.eastmoney.com/"}
+        r = em_get(url, params=params, headers=headers, timeout=10)
+        d = r.json()
+        rows = []
+        for item in d.get("data", {}).get("fastNewsList", []):
+            rows.append({
+                'title': item.get("title", ""),
+                'time': item.get("showTime", ""),
+                'media': '东财7x24',
+                'summary': item.get("summary", "")[:200],
+                'url': ''
+            })
+        return rows
+    except Exception as e:
+        print(f"[WARN] 全球资讯获取失败: {e}")
+        return []
+
+
+# 巨潮 orgId 映射缓存
+_CNINFO_ORGID_MAP = {}
+
+def _cninfo_orgid(code):
+    """查股票真实 orgId"""
+    global _CNINFO_ORGID_MAP
+    if not _CNINFO_ORGID_MAP:
+        try:
+            r = requests.get("http://www.cninfo.com.cn/new/data/szse_stock.json",
+                             headers={"User-Agent": UA}, timeout=15)
+            _CNINFO_ORGID_MAP = {s["code"]: s["orgId"] for s in r.json().get("stockList", [])}
+        except Exception as e:
+            print(f"[WARN] 巨潮orgId映射表拉取失败: {e}")
+    org = _CNINFO_ORGID_MAP.get(code)
+    if org:
+        return org
+    if code.startswith("6"):
+        return f"gssh0{code}"
+    elif code.startswith("8") or code.startswith("4"):
+        return f"gsbj0{code}"
+    return f"gssz0{code}"
+
+def _cninfo_ts_to_date(ts):
+    if isinstance(ts, (int, float)):
+        return datetime.fromtimestamp(ts / 1000).strftime("%Y-%m-%d")
+    return str(ts)[:10] if ts else ""
+
+
+def get_announcements(code):
+    """巨潮公告"""
+    code_num = code[2:] if code.startswith('sh') or code.startswith('sz') else code
+    try:
+        url = "https://www.cninfo.com.cn/new/hisAnnouncement/query"
+        org_id = _cninfo_orgid(code_num)
+        payload = {
+            "stock": f"{code_num},{org_id}",
+            "tabName": "fulltext", "pageSize": "20", "pageNum": "1",
+            "column": "", "category": "", "plate": "", "seDate": "",
+            "searchkey": "", "secid": "", "sortName": "", "sortType": "",
+            "isHLtitle": "true",
+        }
+        headers = {
+            "User-Agent": UA,
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": "https://www.cninfo.com.cn/new/disclosure",
+            "Origin": "https://www.cninfo.com.cn",
+        }
+        r = requests.post(url, data=payload, headers=headers, timeout=15)
+        d = r.json()
+        rows = []
+        for item in d.get("announcements", []) or []:
+            rows.append({
+                'title': item.get("announcementTitle", ""),
+                'code': item.get("announcementId", ""),
+                'date': _cninfo_ts_to_date(item.get("announcementTime")),
+                'type': item.get("announcementTypeName", ""),
+                'url': f"https://www.cninfo.com.cn/new/disclosure/detail?annoId={item.get('announcementId', '')}"
+            })
+        return rows
+    except Exception as e:
+        print(f"[WARN] 公告获取失败: {e}")
+        return []
+
+
+# ============ 7. 基础数据 ============
+def get_financial_table(code, table_type='income'):
+    """新浪财报三表"""
+    code_num = code[2:] if code.startswith('sh') or code.startswith('sz') else code
+    prefix = "sh" if code.startswith('sh') else "sz"
+    report_type = {"income": "lrb", "balance": "fzb", "cashflow": "llb"}.get(table_type, "lrb")
+    try:
+        url = "https://quotes.sina.cn/cn/api/openapi.php/CompanyFinanceService.getFinanceReport2022"
+        params = {
+            "paperCode": f"{prefix}{code_num}",
+            "source": report_type, "type": "0", "page": "1", "num": "8",
+        }
+        headers = {"User-Agent": UA}
+        r = requests.get(url, params=params, headers=headers, timeout=15)
+        report_list = r.json().get("result", {}).get("data", {}).get("report_list", {}) or {}
+        rows = []
+        for period in sorted(report_list.keys(), reverse=True)[:8]:
+            obj = report_list[period]
+            rec = {"报告期": f"{period[:4]}-{period[4:6]}-{period[6:8]}"}
+            for it in obj.get("data", []) or []:
+                title = it.get("item_title", "")
+                if not title or it.get("item_value") is None:
+                    continue
+                rec[title] = it.get("item_value")
+                tongbi = it.get("item_tongbi")
+                if tongbi not in (None, ""):
+                    rec[title + "_同比"] = tongbi
+            rows.append(rec)
+        headers_list = ["报告期"] + list(set(k for r in rows for k in r.keys() if k != "报告期"))
+        return {'table': table_type, 'title': _get_table_title(table_type),
+                'headers': headers_list, 'data': rows}
+    except Exception as e:
+        print(f"[WARN] 财报获取失败: {e}")
+    return {'table': table_type, 'title': _get_table_title(table_type), 'headers': ['报告期'], 'data': []}
+
+def _get_table_title(t):
+    return {'income': '利润表', 'balance': '资产负债表', 'cashflow': '现金流量表'}.get(t, '财报')
+
+
+# ============ 8. 搜索 ============
+def search_stock(keyword):
+    """搜索股票"""
+    results = []
+    try:
+        r = requests.get(
+            f'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={keyword},day,,,1,qfq',
+            timeout=10
+        )
+        data = r.json()
+        for key, val in data.get('data', {}).items():
+            qt = val.get('qt', {})
+            sd = qt.get(key, qt.get('sh' + key, qt.get('sz' + key, [])))
+            if sd:
+                results.append({'code': sd[2], 'name': sd[1], 'full_code': key})
+    except Exception as e:
+        print(f"[WARN] 搜索失败: {e}")
+    return results
+
+
+# ============ 9. 股东户数 ============
+def get_holder_num(code):
+    """股东户数变化 - 东财为主，Tushare备选"""
+    code_num = code[2:] if code.startswith('sh') or code.startswith('sz') else code
+    try:
+        if _check_em_available():
+            data = eastmoney_datacenter(
+                "RPT_HOLDERNUMLATEST",
+                filter_str=f'(SECURITY_CODE="{code_num}")',
+                page_size=10, sort_columns="END_DATE", sort_types="-1"
+            )
+            result = []
+            for row in data:
+                result.append({
+                    'date': str(row.get('END_DATE', ''))[:10],
+                    'holder_num': row.get('HOLDER_NUM', 0),
+                    'change_num': row.get('HOLDER_NUM_CHANGE', 0),
+                    'change_ratio': row.get('HOLDER_NUM_RATIO', 0),
+                    'avg_shares': row.get('AVG_FREE_SHARES', 0),
+                })
+            if result:
+                return result
+    except Exception as e:
+        print(f"[WARN] 东财股东户数获取失败: {e}")
+    
+    # Tushare备选
+    result = []
+    try:
+        pro = get_ts_pro()
+        if pro:
+            ts_code = _to_ts_code(code)
+            start_date = _days_ago_str(365 * 3)
+            end_date = _today_str()
+            df = pro.stk_holdernumber(ts_code=ts_code, start_date=start_date, end_date=end_date)
+            if df is not None and not df.empty:
+                df = df.sort_values('end_date', ascending=False)
+                prev_holders = None
+                for _, row in df.head(10).iterrows():
+                    curr = row.get('holder_num', 0)
+                    change = curr - prev_holders if prev_holders is not None else 0
+                    ratio = (change / prev_holders * 100) if prev_holders else 0
+                    result.append({
+                        'date': str(row.get('end_date', ''))[:10],
+                        'holder_num': int(curr),
+                        'change_num': int(change),
+                        'change_ratio': round(ratio, 2),
+                        'avg_shares': 0
+                    })
+                    prev_holders = curr
+    except Exception as e:
+        print(f"[WARN] Tushare股东户数也失败: {e}")
+    
+    return result
+
+
+# ============ 10. 分红送转 ============
+def get_dividend(code):
+    """分红送转历史 - 东财为主，Tushare备选"""
+    code_num = code[2:] if code.startswith('sh') or code.startswith('sz') else code
+    try:
+        if _check_em_available():
+            data = eastmoney_datacenter(
+                "RPT_SHAREBONUS_DET",
+                filter_str=f'(SECURITY_CODE="{code_num}")',
+                page_size=20, sort_columns="EX_DIVIDEND_DATE", sort_types="-1"
+            )
+            if data:
+                result = []
+                for row in data:
+                    result.append({
+                        'date': str(row.get('EX_DIVIDEND_DATE', ''))[:10],
+                        'bonus_rmb': row.get('PRETAX_BONUS_RMB', 0),
+                        'transfer_ratio': row.get('TRANSFER_RATIO', 0),
+                        'bonus_ratio': row.get('BONUS_RATIO', 0),
+                        'plan': row.get('ASSIGN_PROGRESS', ''),
+                    })
+                return result
+    except Exception as e:
+        print(f"[WARN] 东财分红获取失败: {e}")
+    
+    # Tushare备选
+    result = []
+    try:
+        pro = get_ts_pro()
+        if pro:
+            ts_code = _to_ts_code(code)
+            df = pro.dividend(ts_code=ts_code, fields='ts_code,end_date,stk_div,stk_bo_rate,stk_co_rate,cash_div,record_date,ex_date,div_proc')
+            if df is not None and not df.empty:
+                # 只保留「实施」的分红方案（预案/股东大会通过的 cash_div=0）
+                df = df[df['div_proc'] == '实施'] if 'div_proc' in df.columns else df
+                # 按除权日去重，保留最新
+                df = df.sort_values('ex_date', ascending=False).drop_duplicates(subset=['end_date'], keep='first')
+                df = df.sort_values('end_date', ascending=False)
+                for _, row in df.head(20).iterrows():
+                    def safe_float(v):
+                        try:
+                            f = float(v)
+                            return 0 if math.isnan(f) else f
+                        except:
+                            return 0
+                    def safe_date(v):
+                        if v and str(v) != 'nan' and str(v) != 'None':
+                            return str(v)[:10]
+                        return ''
+                    ex = safe_date(row.get('ex_date'))
+                    end = safe_date(row.get('end_date'))
+                    result.append({
+                        'date': ex or end,
+                        'bonus_rmb': safe_float(row.get('cash_div', 0)),
+                        'transfer_ratio': safe_float(row.get('stk_co_rate', 0)),
+                        'bonus_ratio': safe_float(row.get('stk_bo_rate', 0)),
+                        'plan': '实施' if ex else '预案',
+                    })
+    except Exception as e:
+        print(f"[WARN] Tushare分红也失败: {e}")
+    
+    return result
+
+
+# ============ 11. 宏观数据 ============
+# 宏观数据缓存（减少Tushare调用）
+_MACRO_CACHE = {}
+_MACRO_CACHE_TIME = {}
+
+def _get_macro_cache(key):
+    if key in _MACRO_CACHE and time.time() - _MACRO_CACHE_TIME.get(key, 0) < 3600:
+        return _MACRO_CACHE[key]
+    return None
+
+def _set_macro_cache(key, data):
+    _MACRO_CACHE[key] = data
+    _MACRO_CACHE_TIME[key] = time.time()
+
+def clear_macro_cache():
+    """清除宏观数据缓存（用于调试）"""
+    _MACRO_CACHE.clear()
+    _MACRO_CACHE_TIME.clear()
+
+
+def get_macro_china():
+    """中国宏观数据：GDP、CPI、PPI、M2、Shibor"""
+    result = {}
+    pro = get_ts_pro()
+    if not pro:
+        return result
+    
+    # GDP
+    cached = _get_macro_cache('gdp')
+    if cached is not None:
+        result['gdp'] = cached
+    else:
+        try:
+            df = pro.cn_gdp()
+            if df is not None and not df.empty:
+                df = df.sort_values('quarter', ascending=False)
+                rows = []
+                for _, row in df.head(8).iterrows():
+                    rows.append({
+                        'period': row.get('quarter', ''),
+                        'gdp': row.get('gdp', 0),
+                        'gdp_yoy': row.get('gdp_yoy', 0),
+                        'pi': row.get('pi', 0),
+                        'si': row.get('si', 0),
+                        'ti': row.get('ti', 0),
+                    })
+                result['gdp'] = rows
+                _set_macro_cache('gdp', rows)
+        except Exception as e:
+            print(f"[WARN] GDP获取失败: {e}")
+    
+    # CPI
+    cached = _get_macro_cache('cpi')
+    if cached is not None:
+        result['cpi'] = cached
+    else:
+        try:
+            end_m = datetime.now().strftime('%Y%m')
+            start_m = (datetime.now() - timedelta(days=365)).strftime('%Y%m')
+            df = pro.cn_cpi(start_m=start_m, end_m=end_m)
+            if df is not None and not df.empty:
+                df = df.sort_values('month', ascending=False)
+                rows = []
+                for _, row in df.head(12).iterrows():
+                    rows.append({
+                        'month': row.get('month', ''),
+                        'nt_val': row.get('nt_val', 0),
+                        'nt_yoy': row.get('nt_yoy', 0),
+                        'nt_mom': row.get('nt_mom', 0),
+                    })
+                result['cpi'] = rows
+                _set_macro_cache('cpi', rows)
+        except Exception as e:
+            print(f"[WARN] CPI获取失败: {e}")
+    
+    # PPI
+    cached = _get_macro_cache('ppi')
+    if cached is not None:
+        result['ppi'] = cached
+    else:
+        try:
+            end_m = datetime.now().strftime('%Y%m')
+            start_m = (datetime.now() - timedelta(days=365)).strftime('%Y%m')
+            df = pro.cn_ppi(start_m=start_m, end_m=end_m)
+            if df is not None and not df.empty:
+                df = df.sort_values('month', ascending=False)
+                rows = []
+                for _, row in df.head(12).iterrows():
+                    rows.append({
+                        'month': row.get('month', ''),
+                        'ppi_yoy': row.get('ppi_yoy', 0),
+                        'ppi_mom': row.get('ppi_mom', 0),
+                        'exppi_yoy': row.get('exppi_yoy', 0),
+                    })
+                result['ppi'] = rows
+                _set_macro_cache('ppi', rows)
+        except Exception as e:
+            print(f"[WARN] PPI获取失败: {e}")
+    
+    # M2货币供应
+    cached = _get_macro_cache('m2')
+    if cached is not None:
+        result['m2'] = cached
+    else:
+        try:
+            end_m = datetime.now().strftime('%Y%m')
+            start_m = (datetime.now() - timedelta(days=365)).strftime('%Y%m')
+            df = pro.cn_m(start_m=start_m, end_m=end_m)
+            if df is not None and not df.empty:
+                df = df.sort_values('month', ascending=False)
+                rows = []
+                for _, row in df.head(12).iterrows():
+                    rows.append({
+                        'month': row.get('month', ''),
+                        'm2': row.get('m2', 0),
+                        'm2_yoy': row.get('m2_yoy', 0),
+                        'm1': row.get('m1', 0),
+                        'm1_yoy': row.get('m1_yoy', 0),
+                        'm0': row.get('m0', 0),
+                        'm0_yoy': row.get('m0_yoy', 0),
+                    })
+                result['m2'] = rows
+                _set_macro_cache('m2', rows)
+        except Exception as e:
+            print(f"[WARN] M2获取失败: {e}")
+    
+    # Shibor
+    cached = _get_macro_cache('shibor')
+    if cached is not None:
+        result['shibor'] = cached
+    else:
+        try:
+            end_d = _today_str()
+            start_d = _days_ago_str(30)
+            df = pro.shibor(start_date=start_d, end_date=end_d)
+            if df is not None and not df.empty:
+                df = df.sort_values('date', ascending=False)
+                rows = []
+                for _, row in df.head(20).iterrows():
+                    rows.append({
+                        'date': row.get('date', ''),
+                        'on': row.get('on', 0),
+                        '1w': row.get('1w', 0),
+                        '1m': row.get('1m', 0),
+                        '3m': row.get('3m', 0),
+                        '1y': row.get('1y', 0),
+                    })
+                result['shibor'] = rows
+                _set_macro_cache('shibor', rows)
+        except Exception as e:
+            print(f"[WARN] Shibor获取失败: {e}")
+    
+    return result
+
+
+def _av_get_cpi_yoy(max_rows=24):
+    """Alpha Vantage: 获取美国CPI年率（从指数换算出YoY%）"""
+    try:
+        r = requests.get(
+            "https://www.alphavantage.co/query",
+            params={"function": "CPI", "interval": "monthly", "apikey": "demo"},
+            timeout=15
+        )
+        d = r.json()
+        data = d.get("data", [])
+        if not data:
+            return []
+        
+        # Build index lookup
+        index_data = {}
+        for item in data:
+            val = item.get("value", ".")
+            if val == ".":
+                continue
+            index_data[item["date"]] = float(val)
+        
+        # Calculate YoY
+        result = []
+        for date in sorted(index_data.keys(), reverse=True):
+            parts = date.split("-")
+            year_ago = str(int(parts[0]) - 1) + "-" + parts[1] + "-01"
+            if year_ago in index_data:
+                yoy = round((index_data[date] / index_data[year_ago] - 1) * 100, 1)
+                prev = result[-1]["value"] if result else None
+                result.append({
+                    "date": date,
+                    "value": yoy,
+                    "forecast": None,
+                    "previous": prev
+                })
+            if len(result) >= max_rows:
+                break
+        
+        return result
+    except Exception as e:
+        print(f"[WARN] Alpha Vantage CPI获取失败: {e}")
+        return []
+
+
+def _jin10_get(attr_id, symbol_name, max_rows=24):
+    """金十数据中心API获取美国宏观数据（参考akshare实现）"""
+    headers = {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/120.0.0.0 Safari/537.36",
+        "x-app-id": "rU6QIu7JHe2gOUeR",
+        "x-csrf-token": "x-csrf-token",
+        "x-version": "1.0.0",
+    }
+    url = "https://datacenter-api.jin10.com/reports/list_v2"
+    t = time.time()
+    params = {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": str(attr_id),
+        "_": str(int(round(t * 1000))),
+    }
+    try:
+        r = requests.get(url, params=params, headers=headers, timeout=15)
+        d = r.json()
+        values = d.get("data", {}).get("values", [])
+        if not values:
+            print(f"[WARN] 金十数据 {symbol_name} 返回空")
+            return []
+        rows = []
+        for item in values[:max_rows]:
+            val = item[1] if len(item) > 1 else None
+            # 跳过预发布的null值行（未来数据占位）
+            if val is None or val == '':
+                continue
+            rows.append({
+                'date': item[0] if len(item) > 0 else '',
+                'value': float(val),
+                'forecast': float(item[2]) if len(item) > 2 and item[2] not in (None, '') else None,
+                'previous': float(item[3]) if len(item) > 3 and item[3] not in (None, '') else None,
+            })
+        return rows
+    except Exception as e:
+        print(f"[WARN] 金十数据 {symbol_name} 请求失败: {e}")
+        return []
+
+
+def _eastmoney_usa_indicator(indicator_id, indicator_name, max_rows=24):
+    """东方财富-美国宏观经济指标"""
+    if not _check_em_available():
+        print(f"[WARN] 东财不可达，跳过 {indicator_name}")
+        return []
+    url = "https://datacenter-web.eastmoney.com/api/data/v1/get"
+    params = {
+        "reportName": "RPT_ECONOMICVALUE_USA",
+        "columns": "ALL",
+        "filter": f'(INDICATOR_ID="{indicator_id}")',
+        "pageNumber": "1",
+        "pageSize": str(max_rows),
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+    }
+    try:
+        r = requests.get(url, params=params, timeout=15)
+        d = r.json()
+        data_list = d.get("result", {}).get("data", [])
+        if not data_list:
+            print(f"[WARN] 东财 {indicator_name} 返回空")
+            return []
+        rows = []
+        for item in data_list[:max_rows]:
+            val = item.get('VALUE')
+            # 跳过预发布的null值行（未来数据）
+            if val is None:
+                continue
+            rows.append({
+                'date': str(item.get('REPORT_DATE', ''))[:10],
+                'value': float(val),
+                'previous': float(item.get('PRE_VALUE', 0) or 0),
+            })
+        return rows
+    except Exception as e:
+        print(f"[WARN] 东财 {indicator_name} 请求失败: {e}")
+        return []
+
+
+def get_macro_usa():
+    """美国宏观数据：通过金十数据+东方财富API获取关键指标（真实数据）"""
+    result = {}
+
+    # 汇率作为参考
+    try:
+        url = "https://api.exchangerate-api.com/v4/latest/USD"
+        r = requests.get(url, timeout=10)
+        d = r.json()
+        result['usd_cny'] = d.get('rates', {}).get('CNY', 0)
+        result['usd_cny_date'] = d.get('date', '')
+    except Exception as e:
+        print(f"[WARN] 汇率获取失败: {e}")
+
+    # 1. 美国CPI年率 - Alpha Vantage (最新数据，含YoY换算)
+    cached = _get_macro_cache('us_cpi')
+    if cached is not None:
+        result['cpi'] = cached
+    else:
+        rows = _av_get_cpi_yoy(24)
+        if rows:
+            result['cpi'] = rows
+            _set_macro_cache('us_cpi', rows)
+
+    # 2. 美国非农就业人数 - 金十数据 (attr_id=33)
+    cached = _get_macro_cache('us_payroll')
+    if cached is not None:
+        result['payroll'] = cached
+    else:
+        rows = _jin10_get("33", "美国非农就业人数")
+        if rows:
+            result['payroll'] = rows
+            _set_macro_cache('us_payroll', rows)
+
+    # 3. 美国失业率 - 金十数据 (attr_id=47)
+    cached = _get_macro_cache('us_unemployment')
+    if cached is not None:
+        result['unemployment'] = cached
+    else:
+        rows = _jin10_get("47", "美国失业率")
+        if rows:
+            result['unemployment'] = rows
+            _set_macro_cache('us_unemployment', rows)
+
+    # 4. 美联储利率（联邦基金利率）- Alpha Vantage
+    cached = _get_macro_cache('us_fedrate')
+    if cached is not None:
+        result['fed_rate'] = cached
+    else:
+        try:
+            r = requests.get(
+                "https://www.alphavantage.co/query",
+                params={"function": "FEDERAL_FUNDS_RATE", "interval": "monthly", "apikey": "demo"},
+                timeout=15
+            )
+            d = r.json()
+            av_data = d.get("data", [])
+            rows = []
+            for item in av_data[:24]:
+                val = item.get("value", ".")
+                if val == ".":
+                    continue
+                rows.append({
+                    "date": item["date"],
+                    "value": float(val),
+                    "forecast": None,
+                    "previous": rows[-1]["value"] if rows else None
+                })
+            if rows:
+                result['fed_rate'] = rows
+                _set_macro_cache('us_fedrate', rows)
+        except Exception as e:
+            print(f"[WARN] Alpha Vantage Fed Rate获取失败: {e}")
+
+    # 5. 美国GDP - 金十数据 (attr_id=53)
+    cached = _get_macro_cache('us_gdp')
+    if cached is not None:
+        result['gdp'] = cached
+    else:
+        rows = _jin10_get("53", "美国GDP")
+        if rows:
+            result['gdp'] = rows
+            _set_macro_cache('us_gdp', rows)
+
+    return result
+
+
+def get_macro_calendar():
+    """经济数据发布日历（最近30天和 upcoming）"""
+    calendar = []
+    today = datetime.now()
+    
+    # 中国常规数据发布时间（基于历史规律）
+    regular_releases = [
+        {'name': 'CPI', 'freq': '月度', 'day': 9, 'country': '中国'},
+        {'name': 'PPI', 'freq': '月度', 'day': 9, 'country': '中国'},
+        {'name': 'M2', 'freq': '月度', 'day': 10, 'country': '中国'},
+        {'name': '贸易帐', 'freq': '月度', 'day': 8, 'country': '中国'},
+        {'name': 'GDP', 'freq': '季度', 'months': [1,4,7,10], 'day': 18, 'country': '中国'},
+        {'name': 'PMI', 'freq': '月度', 'day': 31, 'country': '中国'},
+        {'name': '美国CPI', 'freq': '月度', 'day': 13, 'country': '美国'},
+        {'name': '美国非农', 'freq': '月度', 'day': 5, 'country': '美国'},
+        {'name': '美联储利率决议', 'freq': '季度', 'months': [1,3,5,7,9,11], 'day': 20, 'country': '美国'},
+        {'name': '美国GDP', 'freq': '季度', 'months': [1,4,7,10], 'day': 25, 'country': '美国'},
+    ]
+    
+    # 生成最近3个月和未来1个月的日历
+    for month_offset in range(-3, 2):
+        month_date = today.replace(day=1) + timedelta(days=month_offset*30)
+        month_date = month_date.replace(day=1)
+        for rel in regular_releases:
+            if rel['freq'] == '月度':
+                release_date = month_date.replace(day=min(rel['day'], 28))
+                calendar.append({
+                    'date': release_date.strftime('%Y-%m-%d'),
+                    'name': rel['name'],
+                    'country': rel['country'],
+                    'freq': rel['freq'],
+                    'status': '已发布' if release_date < today else '待发布'
+                })
+            elif rel['freq'] == '季度':
+                if month_date.month in rel['months']:
+                    release_date = month_date.replace(day=min(rel['day'], 28))
+                    calendar.append({
+                        'date': release_date.strftime('%Y-%m-%d'),
+                        'name': rel['name'],
+                        'country': rel['country'],
+                        'freq': rel['freq'],
+                        'status': '已发布' if release_date < today else '待发布'
+                    })
+    
+    # 去重并排序
+    seen = set()
+    unique = []
+    for item in sorted(calendar, key=lambda x: x['date']):
+        key = (item['date'], item['name'])
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    
+    return unique[-60:]  # 返回最近60条
+
+# ============ 研报列表 ============
+REPORT_API_URL = "https://reportapi.eastmoney.com/report/list"
+PDF_URL_TPL = "https://pdf.dfcfw.com/pdf/H3_{info_code}_1.pdf"
+
+def get_reports(code, max_pages=3):
+    """东财研报列表 - reportapi.eastmoney.com（未被封）"""
+    code_num = code[2:] if code.startswith('sh') or code.startswith('sz') else code
+    all_records = []
+    try:
+        for page in range(1, max_pages + 1):
+            params = {
+                "industryCode": "*", "pageSize": "50", "industry": "*",
+                "rating": "*", "ratingChange": "*",
+                "beginTime": "2024-01-01", "endTime": "2030-01-01",
+                "pageNo": str(page), "fields": "", "qType": "0",
+                "orgCode": "", "code": code_num, "rcode": "",
+                "p": str(page), "pageNum": str(page), "pageNumber": str(page),
+            }
+            r = requests.get(REPORT_API_URL, params=params,
+                           headers={"User-Agent": UA, "Referer": "https://data.eastmoney.com/"},
+                           timeout=15)
+            d = r.json()
+            rows = d.get("data") or []
+            if not rows:
+                break
+            all_records.extend(rows)
+            if page >= (d.get("TotalPage", 1) or 1):
+                break
+        
+        result = []
+        for item in all_records[:50]:
+            result.append({
+                'title': item.get('title', ''),
+                'date': str(item.get('publishDate', ''))[:10],
+                'org': item.get('orgSName', '') or item.get('orgName', ''),
+                'rating': item.get('emRatingName', ''),
+                'eps_this_year': item.get('predictThisYearEps', ''),
+                'eps_next_year': item.get('predictNextYearEps', ''),
+                'eps_two_year': item.get('predictNextTwoYearEps', ''),
+                'info_code': item.get('infoCode', ''),
+                'stock_name': item.get('stockName', ''),
+            })
+        return result
+    except Exception as e:
+        print(f"[WARN] 研报获取失败: {e}")
+        return []
+

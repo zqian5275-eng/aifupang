@@ -1,0 +1,11 @@
+{
+    "users": [
+        {
+            "username": "花哥",
+            "password": "$2y$10$QsPXB8fS9uFKoX.X\/0zLMeWdvhkmKgmyI2PYdi3nhmcPN2M4vy\/gi",
+            "role": "admin",
+            "created": "2026-06-24 11:14:07",
+            "last_login": null
+        }
+    ]
+}

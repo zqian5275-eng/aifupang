@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /review/
+Allow: /research/
+Allow: /studio/
+
+Sitemap: https://aifupang.com/sitemap.xml

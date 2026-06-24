@@ -1,0 +1,277 @@
+#!/usr/bin/env python3.11
+"""Pipeline server: receives segments [{image_prompt, tts_text}], generates video.
+Listens on port 8767.
+"""
+
+import json, os, sys, time, uuid, re, asyncio, subprocess, tempfile, shutil
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse
+import requests as req
+import edge_tts
+from PIL import Image, ImageDraw, ImageFont
+
+PORT = 8767
+OUTPUT_DIR = "/www/wwwroot/aifupang.com/studio/pipeline/output"
+TEMP_DIR = "/tmp/pipeline"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+IMAGE_API = "https://aifupang.com/studio/image/api.php"
+TTS_API = "http://127.0.0.1:8766/"
+
+_jobs = {}
+
+def find_font():
+    candidates = [
+        "/usr/share/fonts/google-noto-cjk/NotoSansCJKsc-Regular.otf",
+        "/usr/share/fonts/google-noto-cjk/NotoSansCJKsc-Bold.otf",
+        "/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.otf",
+        "/usr/share/fonts/wqy-microhei/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    try:
+        result = subprocess.run(["fc-list", ":lang=zh", "file"], capture_output=True, text=True, timeout=5)
+        for line in result.stdout.strip().split('\n'):
+            if ':' in line:
+                path = line.split(':')[0].strip()
+                if os.path.exists(path):
+                    return path
+    except: pass
+    return "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+FONT_PATH = find_font() or "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+def generate_image(prompt, style="cinematic"):
+    full_prompt = f"{prompt}, {style} style, high quality, detailed"
+    resp = req.post(IMAGE_API, json={
+        "prompt": full_prompt,
+        "size": "1024x768",
+        "mode": "text",
+        "output_format": "url"
+    }, timeout=180)
+    data = resp.json()
+    if data.get("success") and data.get("url"):
+        return data["url"]
+    raise Exception(f"Image failed: {data.get('error', 'unknown')}")
+
+def generate_audio(text, voice="zh-CN-YunxiNeural"):
+    resp = req.post(TTS_API, json={"text": text, "voice": voice}, timeout=60)
+    data = resp.json()
+    if data.get("success") and data.get("url"):
+        return f"http://127.0.0.1:8766/audio/{data['filename']}"
+    raise Exception(f"TTS failed: {data.get('error', 'unknown')}")
+
+def download_file(url, dest):
+    r = req.get(url, timeout=60, stream=True)
+    r.raise_for_status()
+    with open(dest, 'wb') as f:
+        for chunk in r.iter_content(8192): f.write(chunk)
+
+def overlay_text_on_image(image_path, text, output_path, size=(1280, 720)):
+    try:
+        img = Image.open(image_path).convert("RGB")
+        img = img.resize(size, Image.LANCZOS)
+        draw = ImageDraw.Draw(img)
+        font_size = 28
+        try:
+            font = ImageFont.truetype(FONT_PATH, font_size)
+        except:
+            font = ImageFont.load_default()
+        max_width = size[0] - 80
+        lines = []
+        current_line = ""
+        for char in text:
+            test = current_line + char
+            try:
+                bbox = draw.textbbox((0, 0), test, font=font)
+                w = bbox[2] - bbox[0]
+            except:
+                w = len(test) * font_size
+            if w > max_width and current_line:
+                lines.append(current_line)
+                current_line = char
+            else:
+                current_line = test
+        if current_line: lines.append(current_line)
+        lines = lines[:3]
+        line_height = font_size + 8
+        total_height = len(lines) * line_height + 20
+        y_start = size[1] - total_height - 30
+        overlay = Image.new('RGBA', (size[0], total_height), (0, 0, 0, 160))
+        img.paste(overlay, (0, y_start), overlay)
+        for i, line in enumerate(lines):
+            try:
+                bbox = draw.textbbox((0, 0), line, font=font)
+                tw = bbox[2] - bbox[0]
+            except:
+                tw = len(line) * font_size
+            x = (size[0] - tw) // 2
+            y = y_start + 10 + i * line_height
+            draw.text((x, y), line, fill=(255, 255, 255), font=font)
+        img.save(output_path, "JPEG", quality=90)
+    except:
+        img = Image.open(image_path).convert("RGB")
+        img = img.resize(size, Image.LANCZOS)
+        img.save(output_path, "JPEG", quality=90)
+
+def create_video_segment(image_path, audio_path, output_path):
+    cmd = ["ffmpeg", "-y", "-loop", "1", "-i", image_path, "-i", audio_path,
+           "-c:v", "libx264", "-tune", "stillimage", "-c:a", "aac", "-b:a", "128k",
+           "-pix_fmt", "yuv420p", "-shortest", "-movflags", "+faststart", output_path]
+    subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+
+def concat_videos(seg_paths, output_path):
+    list_path = os.path.join(TEMP_DIR, "concat.txt")
+    with open(list_path, 'w') as f:
+        for p in seg_paths: f.write(f"file '{p}'\n")
+    cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", list_path,
+           "-c", "copy", "-movflags", "+faststart", output_path]
+    subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+
+def run_pipeline(job_id, segments, style):
+    job = _jobs[job_id]
+    try:
+        job["total"] = len(segments)
+        job["status"] = "processing"
+        video_segments = []
+        for i, seg in enumerate(segments):
+            job["current"] = i + 1
+            img_prompt = seg.get('image_prompt', '').strip()
+            narration = seg.get('narration', '').strip()
+            if not img_prompt: img_prompt = narration[:200]
+            if not narration: narration = img_prompt
+            
+            job["step"] = "image"
+            image_url = generate_image(img_prompt, style)
+            img_path = os.path.join(TEMP_DIR, f"{job_id}_img_{i}.jpg")
+            download_file(image_url, img_path)
+            
+            job["step"] = "subtitle"
+            sub_path = os.path.join(TEMP_DIR, f"{job_id}_sub_{i}.jpg")
+            overlay_text_on_image(img_path, narration, sub_path)
+            
+            job["step"] = "audio"
+            audio_url = generate_audio(narration)
+            aud_path = os.path.join(TEMP_DIR, f"{job_id}_aud_{i}.mp3")
+            download_file(audio_url, aud_path)
+
+            # Trim leading silence so image + voice start together
+            trimmed_path = aud_path.replace('.mp3', '_trimmed.mp3')
+            subprocess.run([
+                'ffmpeg', '-y', '-i', aud_path,
+                '-af', 'silenceremove=start_periods=1:start_silence=0.1:start_threshold=-35dB',
+                '-c:a', 'libmp3lame', '-b:a', '128k', trimmed_path
+            ], check=True, capture_output=True, timeout=30)
+            aud_path = trimmed_path
+
+            job["step"] = "video"
+            seg_path = os.path.join(TEMP_DIR, f"{job_id}_seg_{i}.mp4")
+            create_video_segment(sub_path, aud_path, seg_path)
+            video_segments.append(seg_path)
+        
+        job["step"] = "concat"
+        output_name = f"{job_id}.mp4"
+        output_path = os.path.join(OUTPUT_DIR, output_name)
+        if len(video_segments) == 1:
+            shutil.copy(video_segments[0], output_path)
+        else:
+            concat_videos(video_segments, output_path)
+        
+        for p in video_segments:
+            try: os.remove(p)
+            except: pass
+        
+        job["status"] = "completed"
+        job["url"] = f"/studio/pipeline/output/{output_name}"
+        job["step"] = "done"
+    except Exception as e:
+        job["status"] = "failed"
+        job["error"] = str(e)
+    
+    try:
+        now = time.time()
+        for f in os.listdir(OUTPUT_DIR):
+            fp = os.path.join(OUTPUT_DIR, f)
+            if os.path.isfile(fp) and now - os.path.getmtime(fp) > 86400:
+                os.remove(fp)
+    except: pass
+
+
+class Handler(BaseHTTPRequestHandler):
+    def _json(self, data, status=200):
+        body = json.dumps(data, ensure_ascii=False).encode('utf-8')
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+
+    def do_GET(self):
+        p = urlparse(self.path)
+        if p.path == '/health':
+            self._json({'status': 'ok'}); return
+        if p.path.startswith('/progress/'):
+            jid = os.path.basename(p.path)
+            job = _jobs.get(jid)
+            if job: self._json(job)
+            else: self._json({'error': 'not found'}, 404)
+            return
+        if p.path.startswith('/output/'):
+            fn = os.path.basename(p.path)
+            fp = os.path.join(OUTPUT_DIR, fn)
+            if os.path.isfile(fp):
+                with open(fp, 'rb') as f: data = f.read()
+                self.send_response(200)
+                self.send_header('Content-Type', 'video/mp4')
+                self.send_header('Content-Length', str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
+        self._json({'error': 'not found'}, 404)
+
+    def do_POST(self):
+        length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(length)
+        try: data = json.loads(body.decode('utf-8'))
+        except:
+            try: data = json.loads(body.decode('gbk'))
+            except:
+                self._json({'error': 'invalid json'}, 400); return
+        
+        segments = data.get('segments', [])
+        style = data.get('style', 'cinematic')
+        
+        if not segments or not isinstance(segments, list):
+            self._json({'error': 'segments required'}, 400); return
+        
+        job_id = uuid.uuid4().hex[:12]
+        _jobs[job_id] = {"id": job_id, "status": "starting", "total": 0, "current": 0, "step": "", "error": None, "url": None}
+        
+        for k in list(_jobs.keys()):
+            if _jobs[k]["status"] in ("completed", "failed"):
+                try: del _jobs[k]
+                except: pass
+        
+        import threading
+        t = threading.Thread(target=run_pipeline, args=(job_id, segments, style), daemon=True)
+        t.start()
+        self._json({"success": True, "job_id": job_id})
+
+    def log_message(self, format, *args): pass
+
+if __name__ == '__main__':
+    server = HTTPServer(('127.0.0.1', PORT), Handler)
+    print(f"Pipeline server on 127.0.0.1:{PORT}", flush=True)
+    server.serve_forever()

@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026年06月11日A股详细复盘报告</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #e0e0e0;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 30px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #00d4ff;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #a0a0a0;
+            font-size: 1.1em;
+        }
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        .section-title {
+            color: #ffd700;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+        }
+        .stat-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-card .label {
+            color: #a0a0a0;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+        .stat-card .value {
+            color: #00d4ff;
+            font-size: 2em;
+            font-weight: bold;
+        }
+        .stat-card .value.up {
+            color: #ff4757;
+        }
+        .stat-card .value.down {
+            color: #2ed573;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th {
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .up {
+            color: #ff4757;
+        }
+        .down {
+            color: #2ed573;
+        }
+        .analysis-text {
+            background: rgba(0, 212, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            line-height: 1.8;
+        }
+        .sector-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .sector-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .sector-card h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+        }
+        .stock-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .stock-item:last-child {
+            border-bottom: none;
+        }
+        .watchlist-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #00d4ff, #0064ff);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+        }
+        .watchlist-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
+        }
+        .watchlist-panel {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background: #1a1a2e;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            width: 350px;
+            max-height: 500px;
+            overflow-y: auto;
+            z-index: 999;
+            display: none;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+        .watchlist-panel.show {
+            display: block;
+        }
+        .watchlist-panel h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+        }
+        .watchlist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .watchlist-item a {
+            color: #00d4ff;
+            text-decoration: none;
+        }
+        .watchlist-item a:hover {
+            text-decoration: underline;
+        }
+        .remove-btn {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .add-btn {
+            background: #2ed573;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        .add-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .export-btn {
+            background: #ffd700;
+            color: #1a1a2e;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 212, 255, 0.9);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            z-index: 2000;
+            display: none;
+        }
+        .toast.show {
+            display: block;
+        }
+        .stock-link {
+            color: #00d4ff;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .stock-link:hover {
+            text-decoration: underline;
+        }
+
+        /* ===== 手机适配 ===== */
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .header { padding: 20px 15px; margin-bottom: 15px; }
+            .header h1 { font-size: 1.3em; }
+            .header p { font-size: 0.85em; }
+            .section { padding: 15px; margin-bottom: 15px; border-radius: 10px; }
+            .section-title { font-size: 1.1em; margin-bottom: 12px; }
+            .stat-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .stat-card { padding: 12px; }
+            .stat-card .value { font-size: 1.3em; }
+            .stat-card .label { font-size: 0.75em; }
+            table { font-size: 0.75em; display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+            th, td { padding: 8px 6px; }
+            .chart-container { max-width: 100%; overflow-x: auto; }
+            .sector-leaders { grid-template-columns: 1fr !important; }
+            .watchlist-btn { font-size: 11px; padding: 6px 12px; }
+        }
+        @media (max-width: 400px) {
+            .stat-cards { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.1em; }
+            .section-title { font-size: 1em; }
+        }
+    </style>
+</head>
+<body>
+    <button class="watchlist-btn" onclick="toggleWatchlist()">⭐ 自选股 (20260611)</button>
+    
+    <div class="watchlist-panel" id="watchlistPanel">
+        <h3>📋 自选股列表</h3>
+        <div id="watchlistContent"></div>
+        <button class="export-btn" onclick="exportWatchlist()">导出到TXT</button>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1>📊 2026年06月11日 A股详细复盘报告</h1>
+            <p>数据来源：同花顺 | tushare | 生成时间：2026-06-12 00:24:18</p>
+        </div>
+
+        <!-- 第一部分：指数/概念分析 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 20px;border-radius:8px;font-size:1.3em;font-weight:bold;">01</span>
+                指数/概念分析
+            </h2>
+            
+            <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:25px;margin-top:20px;">
+                <!-- 左侧：指数与涨跌概览 -->
+                <div>
+                    <h3 style="color:#ffd700;margin-bottom:15px;font-size:1.1em;">📊 指数表现</h3>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:20px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                            <span style="font-weight:bold;">上证指数</span>
+                            <div style="text-align:right;">
+                                <div style="font-size:1.3em;font-weight:bold;">3987.0147</div>
+                                <div class="down" style="font-weight:bold;">-0.16%</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                            <span style="font-weight:bold;">深证成指</span>
+                            <div style="text-align:right;">
+                                <div style="font-size:1.3em;font-weight:bold;">14851.9751</div>
+                                <div class="down" style="font-weight:bold;">-0.68%</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;">
+                            <span style="font-weight:bold;">创业板指</span>
+                            <div style="text-align:right;">
+                                <div style="font-size:1.3em;font-weight:bold;">3811.246</div>
+                                <div class="down" style="font-weight:bold;">-1.13%</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 涨跌饼图示意 -->
+                    <h3 style="color:#ffd700;margin:20px 0 15px;font-size:1.1em;">📈 个股涨跌图</h3>
+                    <div style="display:flex;gap:20px;align-items:center;">
+                        <div style="flex:1;">
+                            <div style="width:180px;height:180px;border-radius:50%;background:conic-gradient(#ff4757 0deg 94.81420988158432deg,#2ed573 94.81420988158432deg 360deg);display:flex;align-items:center;justify-content:center;position:relative;">
+                                <div style="width:100px;height:100px;border-radius:50%;background:#1a1a2e;display:flex;align-items:center;justify-content:center;flex-direction:column;">
+                                    <div style="font-weight:bold;font-size:0.9em;">沪深A股</div>
+                                    <div style="font-size:0.8em;color:#a0a0a0;">4898只</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="flex:1;">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                                <div style="width:20px;height:20px;background:#ff4757;border-radius:3px;"></div>
+                                <span>上涨 1290 (26%)</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                                <div style="width:20px;height:20px;background:#2ed573;border-radius:3px;"></div>
+                                <span>下跌 3608 (74%)</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                                <div style="width:20px;height:20px;background:#ffd700;border-radius:3px;"></div>
+                                <span>涨停 94</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <div style="width:20px;height:20px;background:#a0a0a0;border-radius:3px;"></div>
+                                <span>跌停 47</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 右侧：概念板块与分析 -->
+                <div>
+                    <h3 style="color:#ffd700;margin-bottom:15px;font-size:1.1em;">🔥 涨幅前三的概念</h3>
+                    <table style="width:100%;background:rgba(255,255,255,0.05);border-radius:8px;overflow:hidden;">
+
+                        <tr style="background:rgba(0,212,255,0.2);">
+                            <td style="padding:12px;font-weight:bold;">小金属</td>
+                            <td style="padding:12px;text-align:right;" class="up">+4.60%</td>
+                        </tr>
+
+                        <tr style="">
+                            <td style="padding:12px;font-weight:bold;">电子化学品</td>
+                            <td style="padding:12px;text-align:right;" class="up">+3.85%</td>
+                        </tr>
+
+                        <tr style="">
+                            <td style="padding:12px;font-weight:bold;">氟化工概念</td>
+                            <td style="padding:12px;text-align:right;" class="up">+3.02%</td>
+                        </tr>
+
+                    </table>
+                    
+                    <!-- 市场分析 -->
+                    <h3 style="color:#ffd700;margin:20px 0 15px;font-size:1.1em;">📝 市场分析</h3>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:20px;line-height:1.8;">
+
+                        <p>市场整体偏弱，上涨1290家，下跌3608家。建议保持谨慎，控制仓位，等待更明确的机会。</p>
+                        <p style="margin-top:10px;"><strong>成交额：</strong>今日两市总成交额25369.8亿元</p>
+
+                        <p style="margin-top:10px;color:#ff4757;"><strong>⚠️ 交易提示：</strong>大盘弱势，不追涨；跌停家数大增时不开新仓。</p>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- 02：板块涨跌分布 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">02</span>
+                板块涨跌分布
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>排名</th>
+                        <th>板块名称</th>
+                        <th>涨幅</th>
+                        <th>涨家数</th>
+                        <th>跌家数</th>
+                        <th>领涨股</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                    <tr>
+                        <td>1</td>
+                        <td>小金属</td>
+                        <td class="up">+4.60%</td>
+                        <td>24</td>
+                        <td>5</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz002842.html" target="_blank">翔鹭钨业</a></td>
+                    </tr>
+
+                    <tr>
+                        <td>2</td>
+                        <td>电子化学品</td>
+                        <td class="up">+3.85%</td>
+                        <td>31</td>
+                        <td>11</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz300481.html" target="_blank">濮阳惠成</a></td>
+                    </tr>
+
+                    <tr>
+                        <td>3</td>
+                        <td>氟化工概念</td>
+                        <td class="up">+3.02%</td>
+                        <td>45</td>
+                        <td>16</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sh688268.html" target="_blank">华特气体</a></td>
+                    </tr>
+
+                    <tr>
+                        <td>4</td>
+                        <td>光刻机</td>
+                        <td class="up">+2.74%</td>
+                        <td>28</td>
+                        <td>21</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sh688268.html" target="_blank">华特气体</a></td>
+                    </tr>
+
+                    <tr>
+                        <td>5</td>
+                        <td>国家大基金持股</td>
+                        <td class="up">+2.43%</td>
+                        <td>28</td>
+                        <td>20</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sh688545.html" target="_blank">兴福电子</a></td>
+                    </tr>
+
+                </tbody>
+            </table>
+            <div class="analysis-text">
+                <p><strong>板块分析：</strong>今日领涨板块表现突出，市场热点集中在上述板块。板块轮动特征明显，建议关注持续性较强的板块。</p>
+                <p><strong>💡 交易提示：</strong>根据您的交易体系，板块强时买最强；分歧只切核心，不切跟风。</p>
+            </div>
+        </div>
+
+        <!-- 03：主力资金净流入TOP5 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">03</span>
+                主力资金净流入TOP5
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>排名</th>
+                        <th>股票名称</th>
+                        <th>代码</th>
+                        <th>涨幅</th>
+                        <th>主力净量</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                    <tr>
+                        <td>1</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz001257.html" target="_blank">盛龙股份</a></td>
+                        <td>001257</td>
+                        <td class="up">+9.99%</td>
+                        <td>7.82</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('001257', '盛龙股份', 'sz')">+自选</button></td>
+                    </tr>
+
+                    <tr>
+                        <td>2</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz002490.html" target="_blank">山东墨龙</a></td>
+                        <td>002490</td>
+                        <td class="up">+10.03%</td>
+                        <td>5.63</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('002490', '山东墨龙', 'sz')">+自选</button></td>
+                    </tr>
+
+                    <tr>
+                        <td>3</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz002842.html" target="_blank">翔鹭钨业</a></td>
+                        <td>002842</td>
+                        <td class="up">+10.01%</td>
+                        <td>4.50</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('002842', '翔鹭钨业', 'sz')">+自选</button></td>
+                    </tr>
+
+                    <tr>
+                        <td>4</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz002428.html" target="_blank">云南锗业</a></td>
+                        <td>002428</td>
+                        <td class="up">+10.00%</td>
+                        <td>4.04</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('002428', '云南锗业', 'sz')">+自选</button></td>
+                    </tr>
+
+                    <tr>
+                        <td>5</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz300505.html" target="_blank">川金诺</a></td>
+                        <td>300505</td>
+                        <td class="up">+19.99%</td>
+                        <td>3.98</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('300505', '川金诺', 'sz')">+自选</button></td>
+                    </tr>
+
+                </tbody>
+            </table>
+            <div class="analysis-text">
+                <p><strong>资金流向分析：</strong>今日主力资金重点关注上述个股，建议结合技术面和基本面综合分析。</p>
+            </div>
+        </div>
+
+        <!-- 04：百日新高概念板块分析 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">04</span>
+                百日新高概念板块分析
+            </h2>
+            <div class="sector-cards">
+
+                <div class="sector-card">
+                    <h3>🏆 区块链 (共31只)</h3>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz000021.html" target="_blank">深科技 (000021)</a></span>
+                        <span class="up">+1.93%</span>
+                        <button class="add-btn" onclick="addToWatchlist('000021', '深科技', 'sz')">+自选</button>
+                    </div>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz002123.html" target="_blank">梦网科技 (002123)</a></span>
+                        <span class="down">-4.27%</span>
+                        <button class="add-btn" onclick="addToWatchlist('002123', '梦网科技', 'sz')">+自选</button>
+                    </div>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz300996.html" target="_blank">普联软件 (300996)</a></span>
+                        <span class="down">-0.19%</span>
+                        <button class="add-btn" onclick="addToWatchlist('300996', '普联软件', 'sz')">+自选</button>
+                    </div>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz301213.html" target="_blank">观想科技 (301213)</a></span>
+                        <span class="up">+0.29%</span>
+                        <button class="add-btn" onclick="addToWatchlist('301213', '观想科技', 'sz')">+自选</button>
+                    </div>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz301638.html" target="_blank">南网数字 (301638)</a></span>
+                        <span class="down">-0.72%</span>
+                        <button class="add-btn" onclick="addToWatchlist('301638', '南网数字', 'sz')">+自选</button>
+                    </div>
+
+                </div>
+
+                <div class="sector-card">
+                    <h3>🏆 人工智能 (共24只)</h3>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz002123.html" target="_blank">梦网科技 (002123)</a></span>
+                        <span class="down">-4.27%</span>
+                        <button class="add-btn" onclick="addToWatchlist('002123', '梦网科技', 'sz')">+自选</button>
+                    </div>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz300996.html" target="_blank">普联软件 (300996)</a></span>
+                        <span class="down">-0.19%</span>
+                        <button class="add-btn" onclick="addToWatchlist('300996', '普联软件', 'sz')">+自选</button>
+                    </div>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz301213.html" target="_blank">观想科技 (301213)</a></span>
+                        <span class="up">+0.29%</span>
+                        <button class="add-btn" onclick="addToWatchlist('301213', '观想科技', 'sz')">+自选</button>
+                    </div>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz301638.html" target="_blank">南网数字 (301638)</a></span>
+                        <span class="down">-0.72%</span>
+                        <button class="add-btn" onclick="addToWatchlist('301638', '南网数字', 'sz')">+自选</button>
+                    </div>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz301178.html" target="_blank">天亿马 (301178)</a></span>
+                        <span class="down">-1.14%</span>
+                        <button class="add-btn" onclick="addToWatchlist('301178', '天亿马', 'sz')">+自选</button>
+                    </div>
+
+                </div>
+
+                <div class="sector-card">
+                    <h3>🏆 数据要素 (共23只)</h3>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz002123.html" target="_blank">梦网科技 (002123)</a></span>
+                        <span class="down">-4.27%</span>
+                        <button class="add-btn" onclick="addToWatchlist('002123', '梦网科技', 'sz')">+自选</button>
+                    </div>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz300996.html" target="_blank">普联软件 (300996)</a></span>
+                        <span class="down">-0.19%</span>
+                        <button class="add-btn" onclick="addToWatchlist('300996', '普联软件', 'sz')">+自选</button>
+                    </div>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz301638.html" target="_blank">南网数字 (301638)</a></span>
+                        <span class="down">-0.72%</span>
+                        <button class="add-btn" onclick="addToWatchlist('301638', '南网数字', 'sz')">+自选</button>
+                    </div>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz301178.html" target="_blank">天亿马 (301178)</a></span>
+                        <span class="down">-1.14%</span>
+                        <button class="add-btn" onclick="addToWatchlist('301178', '天亿马', 'sz')">+自选</button>
+                    </div>
+
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="https://quote.eastmoney.com/sz301159.html" target="_blank">三维天地 (301159)</a></span>
+                        <span class="down">-3.38%</span>
+                        <button class="add-btn" onclick="addToWatchlist('301159', '三维天地', 'sz')">+自选</button>
+                    </div>
+
+                </div>
+
+            </div>
+            <div class="analysis-text">
+                <p><strong>百日新高分析：</strong>今日创百日新高的个股主要集中在上述概念板块。创新高个股往往代表市场资金的认可度，可作为后续观察的重点。</p>
+            </div>
+        </div>
+
+        <!-- 05：三大指数技术面 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">05</span>
+                三大指数技术面
+            </h2>
+            <div class="analysis-text">
+                <h3 style="color:#00d4ff;margin-top:15px;">上证指数分析</h3>
+                <p><strong>收盘价：</strong>3987.01 (-0.16%)</p>
+                <p>• 支撑位分析：第一支撑位 3927.85，第二支撑位 3927.85</p>
+                <p>• 压力位分析：第一压力位 4112.96，第二压力位 4199.53</p>
+                <p>• 均线系统：MA5 3995.47，MA10 4032.05，MA20 4079.98，MA60 4049.19</p>
+                <h3 style="color:#00d4ff;margin-top:15px;">深证成指分析</h3>
+                <p><strong>收盘价：</strong>14851.98 (-0.68%)</p>
+                <p>• 支撑位分析：第一支撑位 14681.64，第二支撑位 14681.64</p>
+                <p>• 压力位分析：第一压力位 15981.93，第二压力位 16047.41</p>
+                <p>• 均线系统：MA5 15042.14，MA10 15308.36，MA20 15474.54，MA60 14832.67</p>
+                <h3 style="color:#00d4ff;margin-top:15px;">创业板指分析</h3>
+                <p><strong>收盘价：</strong>3811.25 (-1.13%)</p>
+                <p>• 支撑位分析：第一支撑位 3755.61，第二支撑位 3755.61</p>
+                <p>• 压力位分析：第一压力位 4218.33，第二压力位 4218.33</p>
+                <p>• 均线系统：MA5 3879.50，MA10 3965.41，MA20 3966.58，MA60 3664.82</p>
+                <h3 style="color:#ffd700;margin-top:15px;">💡 市场情绪分析</h3>
+                <p>• <strong>大盘强弱：</strong>涨跌比0.36，今日市场弱势</p>
+                <p>• <strong>交易提示：</strong>板块强时买最强，分歧只切核心，不切跟风</p>
+            </div>
+        </div>
+
+        <!-- 06：强势板块龙头股 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">06</span>
+                强势板块龙头股
+            </h2>
+            
+            <style>
+                .sector-tabs {
+                    display: flex;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                    flex-wrap: wrap;
+                }
+                .sector-tab {
+                    padding: 12px 24px;
+                    background: rgba(255,255,255,0.05);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    border-radius: 8px;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    font-weight: 500;
+                }
+                .sector-tab:hover {
+                    background: rgba(255,255,255,0.1);
+                    border-color: rgba(255,215,0,0.3);
+                }
+                .sector-tab.active {
+                    background: rgba(255,215,0,0.15);
+                    border-color: rgba(255,215,0,0.5);
+                    color: #ffd700;
+                }
+                .sector-stock-panel {
+                    background: rgba(255,255,255,0.03);
+                    border-radius: 12px;
+                    padding: 20px;
+                    border: 1px solid rgba(255,255,255,0.08);
+                }
+                .sector-panel-title {
+                    font-size: 18px;
+                    font-weight: 600;
+                    margin-bottom: 15px;
+                    color: #00d4ff;
+                }
+                .stock-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                    gap: 12px;
+                }
+                .stock-card {
+                    background: rgba(255,255,255,0.03);
+                    padding: 15px;
+                    border-radius: 8px;
+                    border: 1px solid rgba(255,255,255,0.08);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                }
+                .stock-card-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .stock-name {
+                    font-weight: 600;
+                    font-size: 16px;
+                }
+                .stock-change {
+                    font-weight: 600;
+                    font-size: 15px;
+                }
+                .stock-card-footer {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .leader-card {
+                    border: 2px solid rgba(255, 215, 0, 0.5);
+                    background: rgba(255, 215, 0, 0.05);
+                }
+                .middle-card {
+                    border: 2px solid rgba(0, 212, 255, 0.5);
+                    background: rgba(0, 212, 255, 0.05);
+                }
+        
+        /* ===== 手机适配 ===== */
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .header { padding: 20px 15px; margin-bottom: 15px; }
+            .header h1 { font-size: 1.3em; }
+            .header p { font-size: 0.85em; }
+            .section { padding: 15px; margin-bottom: 15px; border-radius: 10px; }
+            .section-title { font-size: 1.1em; margin-bottom: 12px; }
+            .stat-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .stat-card { padding: 12px; }
+            .stat-card .value { font-size: 1.3em; }
+            .stat-card .label { font-size: 0.75em; }
+            table { font-size: 0.75em; display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+            th, td { padding: 8px 6px; }
+            .chart-container { max-width: 100%; overflow-x: auto; }
+            .sector-leaders { grid-template-columns: 1fr !important; }
+            .watchlist-btn { font-size: 11px; padding: 6px 12px; }
+        }
+        @media (max-width: 400px) {
+            .stat-cards { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.1em; }
+            .section-title { font-size: 1em; }
+        }
+    </style>
+            
+            <!-- 板块标签 -->
+            <div class="sector-tabs" id="sectorTabs">
+
+                <div class="sector-tab active" onclick="selectSector(0)">小金属 <span style="color:#ff6b6b;">+4.60%</span></div>
+
+                <div class="sector-tab" onclick="selectSector(1)">电子化学品 <span style="color:#ff6b6b;">+3.85%</span></div>
+
+                <div class="sector-tab" onclick="selectSector(2)">氟化工概念 <span style="color:#ff6b6b;">+3.02%</span></div>
+
+                <div class="sector-tab" onclick="selectSector(3)">光刻机 <span style="color:#ff6b6b;">+2.74%</span></div>
+
+            </div>
+            
+            <!-- 板块成分股面板 -->
+            <div class="sector-stock-panel" id="sectorStockPanel">
+
+                <div class="sector-panel" id="sectorPanel0" style="display: block;">
+                    <div class="sector-panel-title">🔥 小金属 - 板块涨幅：+4.60% | 涨停数：7</div>
+                    <div class="stock-grid">
+
+                    </div>
+                </div>
+
+                <div class="sector-panel" id="sectorPanel1" style="display: none;">
+                    <div class="sector-panel-title">🔥 电子化学品 - 板块涨幅：+3.85% | 涨停数：3</div>
+                    <div class="stock-grid">
+
+                        <div class="stock-card leader-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz002643.html" target="_blank">👑 龙头 万润股份</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(002643)</div>
+                                </div>
+                                <div class="stock-change up">+6.55%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">电子化学品</div>
+                                <button class="add-btn" onclick="addToWatchlist('002643', '万润股份', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card leader-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz002584.html" target="_blank">🐲 龙二 西陇科学</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(002584)</div>
+                                </div>
+                                <div class="stock-change up">+1.99%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">电子化学品</div>
+                                <button class="add-btn" onclick="addToWatchlist('002584', '西陇科学', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card leader-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz300481.html" target="_blank">🔥 龙三 濮阳惠成</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(300481)</div>
+                                </div>
+                                <div class="stock-change up">+20.01%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">电子化学品</div>
+                                <button class="add-btn" onclick="addToWatchlist('300481', '濮阳惠成', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz300346.html" target="_blank">南大光电</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(300346)</div>
+                                </div>
+                                <div class="stock-change up">+8.08%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">电子化学品</div>
+                                <button class="add-btn" onclick="addToWatchlist('300346', '南大光电', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz300054.html" target="_blank">鼎龙股份</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(300054)</div>
+                                </div>
+                                <div class="stock-change up">+6.25%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">电子化学品</div>
+                                <button class="add-btn" onclick="addToWatchlist('300054', '鼎龙股份', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz300236.html" target="_blank">上海新阳</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(300236)</div>
+                                </div>
+                                <div class="stock-change up">+5.80%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">电子化学品</div>
+                                <button class="add-btn" onclick="addToWatchlist('300236', '上海新阳', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz300576.html" target="_blank">容大感光</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(300576)</div>
+                                </div>
+                                <div class="stock-change up">+3.60%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">电子化学品</div>
+                                <button class="add-btn" onclick="addToWatchlist('300576', '容大感光', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz300537.html" target="_blank">广信材料</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(300537)</div>
+                                </div>
+                                <div class="stock-change up">+3.30%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">电子化学品</div>
+                                <button class="add-btn" onclick="addToWatchlist('300537', '广信材料', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="sector-panel" id="sectorPanel2" style="display: none;">
+                    <div class="sector-panel-title">🔥 氟化工概念 - 板块涨幅：+3.02% | 涨停数：8</div>
+                    <div class="stock-grid">
+
+                        <div class="stock-card leader-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sh600141.html" target="_blank">👑 龙头 兴发集团</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(600141)</div>
+                                </div>
+                                <div class="stock-change up">+10.02%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">氟化工概念</div>
+                                <button class="add-btn" onclick="addToWatchlist('600141', '兴发集团', 'sh')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card leader-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz002971.html" target="_blank">🐲 龙二 和远气体</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(002971)</div>
+                                </div>
+                                <div class="stock-change up">+10.01%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">氟化工概念</div>
+                                <button class="add-btn" onclick="addToWatchlist('002971', '和远气体', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card leader-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz300346.html" target="_blank">🔥 龙三 南大光电</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(300346)</div>
+                                </div>
+                                <div class="stock-change up">+8.08%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">氟化工概念</div>
+                                <button class="add-btn" onclick="addToWatchlist('300346', '南大光电', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz002409.html" target="_blank">雅克科技</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(002409)</div>
+                                </div>
+                                <div class="stock-change up">+10.00%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">氟化工概念</div>
+                                <button class="add-btn" onclick="addToWatchlist('002409', '雅克科技', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sh600378.html" target="_blank">昊华科技</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(600378)</div>
+                                </div>
+                                <div class="stock-change up">+10.00%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">氟化工概念</div>
+                                <button class="add-btn" onclick="addToWatchlist('600378', '昊华科技', 'sh')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz002407.html" target="_blank">多氟多</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(002407)</div>
+                                </div>
+                                <div class="stock-change up">+9.99%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">氟化工概念</div>
+                                <button class="add-btn" onclick="addToWatchlist('002407', '多氟多', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz000422.html" target="_blank">湖北宜化</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(000422)</div>
+                                </div>
+                                <div class="stock-change up">+8.99%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">氟化工概念</div>
+                                <button class="add-btn" onclick="addToWatchlist('000422', '湖北宜化', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz002915.html" target="_blank">中欣氟材</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(002915)</div>
+                                </div>
+                                <div class="stock-change up">+7.05%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">氟化工概念</div>
+                                <button class="add-btn" onclick="addToWatchlist('002915', '中欣氟材', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="sector-panel" id="sectorPanel3" style="display: none;">
+                    <div class="sector-panel-title">🔥 光刻机 - 板块涨幅：+2.74% | 涨停数：5</div>
+                    <div class="stock-grid">
+
+                        <div class="stock-card leader-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sh600353.html" target="_blank">👑 龙头 旭光电子</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(600353)</div>
+                                </div>
+                                <div class="stock-change up">+9.99%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">光刻机</div>
+                                <button class="add-btn" onclick="addToWatchlist('600353', '旭光电子', 'sh')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card leader-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sh603738.html" target="_blank">🐲 龙二 泰晶科技</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(603738)</div>
+                                </div>
+                                <div class="stock-change up">+7.50%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">光刻机</div>
+                                <button class="add-btn" onclick="addToWatchlist('603738', '泰晶科技', 'sh')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card leader-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz300666.html" target="_blank">🔥 龙三 江丰电子</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(300666)</div>
+                                </div>
+                                <div class="stock-change up">+20.00%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">光刻机</div>
+                                <button class="add-btn" onclick="addToWatchlist('300666', '江丰电子', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz300786.html" target="_blank">国林科技</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(300786)</div>
+                                </div>
+                                <div class="stock-change up">+6.49%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">光刻机</div>
+                                <button class="add-btn" onclick="addToWatchlist('300786', '国林科技', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz003031.html" target="_blank">中瓷电子</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(003031)</div>
+                                </div>
+                                <div class="stock-change up">+3.56%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">光刻机</div>
+                                <button class="add-btn" onclick="addToWatchlist('003031', '中瓷电子', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sh600895.html" target="_blank">张江高科</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(600895)</div>
+                                </div>
+                                <div class="stock-change up">+3.47%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">光刻机</div>
+                                <button class="add-btn" onclick="addToWatchlist('600895', '张江高科', 'sh')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz301095.html" target="_blank">广立微</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(301095)</div>
+                                </div>
+                                <div class="stock-change up">+2.64%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">光刻机</div>
+                                <button class="add-btn" onclick="addToWatchlist('301095', '广立微', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                        <div class="stock-card">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="https://quote.eastmoney.com/sz300331.html" target="_blank">苏大维格</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">(300331)</div>
+                                </div>
+                                <div class="stock-change up">+2.04%</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">光刻机</div>
+                                <button class="add-btn" onclick="addToWatchlist('300331', '苏大维格', 'sz')">+自选</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+            
+            <div class="analysis-text" style="margin-top: 20px;">
+                <p><strong>💡 交易提示：</strong>板块强时买最强，分歧只切核心，不切跟风；龙头出来后别急着满仓，把钱留给龙回头。</p>
+            </div>
+        </div>
+        
+        <script>
+        // 板块切换功能
+        function selectSector(index) {
+            // 更新标签状态
+            const tabs = document.querySelectorAll('.sector-tab');
+            tabs.forEach((tab, idx) => {
+                tab.classList.toggle('active', idx === index);
+            });
+            
+            // 更新成分股显示
+            const panels = document.querySelectorAll('.sector-panel');
+            panels.forEach((panel, idx) => {
+                panel.style.display = idx === index ? 'block' : 'none';
+            });
+        }
+        </script>
+
+        <!-- 07：推荐交易机会 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">07</span>
+                推荐交易机会
+            </h2>
+            <div class="analysis-text">
+                <h3 style="color:#ffd700;">🎯 交易体系执行清单</h3>
+                <p style="margin-bottom:10px;"><strong>第一步：大盘环境判断</strong></p>
+                <ul>
+                    <li>❌ 大盘弱势，禁止追涨，不开新仓</li>
+                    <li>❌ 跌停家数较多，空仓观望</li>
+                    <li>涨跌比：0.36</li>
+                </ul>
+                
+                <p style="margin-top:15px;margin-bottom:10px;"><strong>第二步：板块选择</strong></p>
+                <ul>
+                    <li>今日领涨板块：小金属, 电子化学品, 氟化工概念, 光刻机</li>
+                    <li>✅ 板块强时买最强，优先关注龙头</li>
+                    <li>✅ 分歧只切核心，不切跟风</li>
+                </ul>
+                
+                <h3 style="color:#00d4ff;margin-top:20px;">🔥 核心关注标的</h3>
+
+                <p><strong>【强势股池】</strong></p>
+                <table style="width:100%;margin-top:10px;">
+                    <tr>
+                        <th>排名</th>
+                        <th>股票</th>
+                        <th>涨幅</th>
+                        <th>概念</th>
+                        <th>关注周期</th>
+                        <th>风险排查</th>
+                        <th>操作</th>
+                    </tr>
+
+                    <tr>
+                        <td>👑 龙头</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sh600141.html" target="_blank">兴发集团 (600141)</a></td>
+                        <td class="up">+10.02%</td>
+                        <td>氟化工概念</td>
+                        <td>⚡ 短线</td>
+                        <td>✅ 安全</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('600141', '兴发集团', 'sh')">+自选</button></td>
+                    </tr>
+
+                    <tr>
+                        <td>🐲 龙二</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz002971.html" target="_blank">和远气体 (002971)</a></td>
+                        <td class="up">+10.01%</td>
+                        <td>氟化工概念</td>
+                        <td>⚡ 短线</td>
+                        <td>✅ 安全</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('002971', '和远气体', 'sz')">+自选</button></td>
+                    </tr>
+
+                    <tr>
+                        <td>🐎 中军</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz002409.html" target="_blank">雅克科技 (002409)</a></td>
+                        <td class="up">+10.00%</td>
+                        <td>氟化工概念</td>
+                        <td>⚡ 短线</td>
+                        <td>✅ 安全</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('002409', '雅克科技', 'sz')">+自选</button></td>
+                    </tr>
+
+                    <tr>
+                        <td>📈 强势</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz300481.html" target="_blank">濮阳惠成 (300481)</a></td>
+                        <td class="up">+20.01%</td>
+                        <td>电子化学品</td>
+                        <td>📅 中期</td>
+                        <td>✅ 安全</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('300481', '濮阳惠成', 'sz')">+自选</button></td>
+                    </tr>
+
+                    <tr>
+                        <td>📈 强势</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz300666.html" target="_blank">江丰电子 (300666)</a></td>
+                        <td class="up">+20.00%</td>
+                        <td>光刻机</td>
+                        <td>📅 中期</td>
+                        <td>✅ 安全</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('300666', '江丰电子', 'sz')">+自选</button></td>
+                    </tr>
+
+                    <tr>
+                        <td>📈 强势</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz300346.html" target="_blank">南大光电 (300346)</a></td>
+                        <td class="up">+8.08%</td>
+                        <td>电子化学品</td>
+                        <td>📅 中期</td>
+                        <td>✅ 安全</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('300346', '南大光电', 'sz')">+自选</button></td>
+                    </tr>
+
+                    <tr>
+                        <td>📈 强势</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sh600378.html" target="_blank">昊华科技 (600378)</a></td>
+                        <td class="up">+10.00%</td>
+                        <td>氟化工概念</td>
+                        <td>📅 中期</td>
+                        <td>✅ 安全</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('600378', '昊华科技', 'sh')">+自选</button></td>
+                    </tr>
+
+                    <tr>
+                        <td>📈 强势</td>
+                        <td><a class="stock-link" href="https://quote.eastmoney.com/sz002549.html" target="_blank">凯美特气 (002549)</a></td>
+                        <td class="up">+10.00%</td>
+                        <td>氟化工概念</td>
+                        <td>📅 中期</td>
+                        <td>✅ 安全</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('002549', '凯美特气', 'sz')">+自选</button></td>
+                    </tr>
+
+                </table>
+
+                <h3 style="color:#ffd700;margin-top:20px;">📋 具体交易策略</h3>
+                <p><strong>今日操作建议：</strong></p>
+                <ul>
+                    <li>🎯 仓位建议：空仓或1成以内</li>
+                    <li>🎯 选股方向：今日强势板块龙头、百日新高个股</li>
+                    <li>🎯 买点原则：绿转红看承接，不追高</li>
+                    <li>🎯 卖点原则：高开无量先卖，炸板30分钟不回封走</li>
+                </ul>
+                
+                <h3 style="color:#ff4757;margin-top:20px;">⚠️ 今日特别风险提示</h3>
+                <ul>
+                    <li>⚠️ 严禁追高，空仓为主</li>
+                    <li>⚠️ 今日跌停47家，注意情绪退潮</li>
+                    <li>⚠️ 高位股注意风险，避免接盘</li>
+                    <li>⚠️ 严格执行止损纪律，不抱侥幸</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 08：风险提示 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">08</span>
+                风险提示
+            </h2>
+            <div class="analysis-text">
+                <h3 style="color:#ff4757;">⚠️ 今日市场风险（基于2026年6月4日最新消息）</h3>
+                <ul>
+                    <li><strong>缩量调整风险：</strong>上证指数跳空低开收跌0.64%，成交额1.27万亿较上日缩减1成以上，三大指数集体下跌，科创50是唯一上涨指数+0.69%。</li>
+                    <li><strong>个股普跌风险：</strong>全市场下跌4121家，上涨仅1344家，涨跌比约1:3，超4100股飘绿，市场做多情绪明显降温。</li>
+                    <li><strong>权重板块与题材板块双双杀跌风险：</strong>石油、酿酒、零售、食品饮料、有色、券商、医药等板块走低，仅有船舶、元器件、半导体、煤炭等少数板块逆市拉升。</li>
+                    <li><strong>明日方向选择风险：</strong>本周4个交易日两上两下，基本围绕60日均线震荡，明日或面临方向选择：要么跌穿120日均线向4000点逼近，要么反弹站上5日、10日均线收复4100点。</li>
+                    <li><strong>流动性边际收紧风险：</strong>全球流动性进入由宽松转向边际收紧的关键拐点，科技板块单边上行的顺畅行情难以延续，板块整体波动率放大，行情轮动加快。</li>
+                </ul>
+                
+                <h3 style="color:#ff9900;">🚫 规避板块与个股</h3>
+                <ul>
+                    <li>石油、酿酒、零售、食品饮料、有色、券商、医药等板块走低，暂时规避。</li>
+                    <li>近期涨幅过大的CPO、光模块等AI硬件方向，警惕高位回调风险。</li>
+                    <li>ST、*ST等高退市风险股票坚决规避！</li>
+                </ul>
+                
+                <h3 style="color:#2ed573;">🔍 个股风险排查验证（核心关注）</h3>
+                <ul>
+                    <li><strong>业绩风险：</strong>关注个股财报情况，避免买入连续亏损或业绩大幅下滑的公司。</li>
+                    <li><strong>解禁风险：</strong>注意大股东解禁时间，避免买入即将大额解禁的个股。</li>
+                    <li><strong>退市风险：</strong>避免ST、*ST等高风险个股，这类股票面临退市风险。</li>
+                    <li><strong>次新股风险：</strong>上市不足1年的次新股波动较大，建议谨慎参与。</li>
+                    <li><strong>科创板风险：</strong>科创板股票涨跌幅更大，波动更剧烈，适合风险承受能力较高的投资者。</li>
+                </ul>
+                
+                <h3 style="color:#1e90ff;">📌 操作建议</h3>
+                <ul>
+                    <li>仓位建议：适度控制仓位，激进型4-5成，稳健型2-3成，保守型1-2成或观望，等待明日方向明朗后再加大配置。</li>
+                    <li>选股方向：关注工业气体、玻璃基板、存储芯片、CPO概念等逆势活跃品种，以及船舶、元器件、半导体、煤炭等逆市拉升板块。</li>
+                    <li>买点原则：等待回调机会，不追高，关注明日指数方向选择，若站稳60日均线再考虑进场。</li>
+                    <li>卖点原则：持仓品种若跌破关键支撑位，果断止盈止损，严格控制回撤。</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 09：总结 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">09</span>
+                总结
+            </h2>
+            <div class="analysis-text">
+                <h3 style="color:#ffd700;">📊 市场总结</h3>
+                <p>今日市场弱势，上涨1290家，下跌3608家，涨停5家，跌停47家，总成交额25369.8亿元。</p>
+                
+                <h3 style="color:#00d4ff;margin-top:15px;">🔥 板块总结</h3>
+                <p>今日领涨板块包括：小金属, 电子化学品, 氟化工概念, 光刻机</p>
+                
+                <h3 style="color:#2ed573;margin-top:15px;">👑 龙头总结</h3>
+                <p>重点关注各板块的龙头股表现，特别是有持续性的板块龙头。板块强时买最强，分歧只切核心，不切跟风。</p>
+                
+                <h3 style="color:#ffd700;margin-top:15px;">📝 交易计划</h3>
+                <p>• 仓位：空仓或轻仓</p>
+                <p>• 关注方向：今日强势板块龙头、百日新高个股</p>
+                <p>• 禁忌：不追涨、不开新仓</p>
+                
+                <h3 style="color:#00d4ff;margin-top:15px;">🔮 明日展望</h3>
+                <p>• 关注今日强势板块的持续性</p>
+                <p>• 关注龙头股的表现</p>
+                <p>• 关注成交量变化</p>
+                <p>• 严格执行交易纪律，控制风险</p>
+            </div>
+        </div>
+
+        <div class="footer" style="text-align: center; padding: 30px; color: #a0a0a0;">
+            <p>📈 投资有风险，入市需谨慎 | 本报告仅供参考，不构成投资建议</p>
+            <p>© 2026 A股复盘系统 | 数据来源：同花顺 | tushare</p>
+        </div>
+    </div>
+
+    <script>
+        const WATCHLIST_KEY = 'watchlist_20260611';
+        let watchlist = [];
+        
+        // 初始化 - 确保DOM加载完成
+        document.addEventListener('DOMContentLoaded', function() {
+            loadWatchlist();
+        });
+        
+        function loadWatchlist() {
+            try {
+                const saved = localStorage.getItem(WATCHLIST_KEY);
+                if (saved) {
+                    watchlist = JSON.parse(saved);
+                }
+            } catch (e) {
+                console.error('加载自选股失败:', e);
+                watchlist = [];
+            }
+            updateWatchlistDisplay();
+        }
+        
+        function saveWatchlist() {
+            try {
+                localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist));
+            } catch (e) {
+                console.error('保存自选股失败:', e);
+            }
+            updateWatchlistDisplay();
+        }
+        
+        function addToWatchlist(code, name, exchange) {
+            try {
+                const exists = watchlist.find(s => s.code === code);
+                if (exists) {
+                    showToast('已在自选股中');
+                    return;
+                }
+                watchlist.push({ code, name, exchange });
+                saveWatchlist();
+                showToast('✓ 已添加到自选股: ' + name);
+            } catch (e) {
+                console.error('添加自选股失败:', e);
+                showToast('添加失败，请重试');
+            }
+        }
+        
+        function removeFromWatchlist(code) {
+            try {
+                watchlist = watchlist.filter(s => s.code !== code);
+                saveWatchlist();
+                showToast('已从自选股删除');
+            } catch (e) {
+                console.error('删除自选股失败:', e);
+                showToast('删除失败，请重试');
+            }
+        }
+        
+        function updateWatchlistDisplay() {
+            try {
+                const content = document.getElementById('watchlistContent');
+                const btn = document.querySelector('.watchlist-btn');
+                if (content) {
+                    if (watchlist.length === 0) {
+                        content.innerHTML = '<p style="color:#a0a0a0;">暂无自选股</p>';
+                    } else {
+                        content.innerHTML = watchlist.map(s => `
+                            <div class="watchlist-item">
+                                <a href="https://quote.eastmoney.com/${s.exchange}${s.code}.html" target="_blank" style="flex:1;">${s.name} (${s.code})</a>
+                                <button class="remove-btn" onclick="removeFromWatchlist('${s.code}')">删除</button>
+                            </div>
+                        `).join('');
+                    }
+                }
+                if (btn) {
+                    btn.textContent = `⭐ 自选股 (${watchlist.length})`;
+                }
+            } catch (e) {
+                console.error('更新自选股显示失败:', e);
+            }
+        }
+        
+        function toggleWatchlist() {
+            try {
+                const panel = document.getElementById('watchlistPanel');
+                if (panel) {
+                    panel.classList.toggle('show');
+                }
+            } catch (e) {
+                console.error('切换自选股面板失败:', e);
+            }
+        }
+        
+        function exportWatchlist() {
+            try {
+                if (watchlist.length === 0) {
+                    showToast('自选股为空');
+                    return;
+                }
+                let content = '自选股列表 - 2026年06月11日\n';
+                content += '='.repeat(40) + '\n';
+                watchlist.forEach((s, idx) => {
+                    content += `${idx + 1}. ${s.name} (${s.code}) - https://quote.eastmoney.com/${s.exchange}${s.code}.html\n`;
+                });
+                content += '='.repeat(40) + '\n';
+                content += '导出时间：' + new Date().toLocaleString('zh-CN');
+                
+                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = '自选股_20260611.txt';
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('✓ 导出成功');
+            } catch (e) {
+                console.error('导出失败:', e);
+                showToast('导出失败，请重试');
+            }
+        }
+        
+        function showToast(message) {
+            try {
+                const toast = document.getElementById('toast');
+                if (toast) {
+                    toast.textContent = message;
+                    toast.classList.add('show');
+                    setTimeout(() => {
+                        toast.classList.remove('show');
+                    }, 2500);
+                }
+            } catch (e) {
+                console.error('显示提示失败:', e);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI智能投研平台 - 介绍视频</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+        /* HyperFrames composition root */
+        #root {
+            width: 1920px;
+            height: 1080px;
+            position: relative;
+            overflow: hidden;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #161b22;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-purple: #bc8cff;
+            --text-primary: #e1e4e8;
+            --text-secondary: #8b949e;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            width: 1920px;
+            height: 1080px;
+        }
+        
+        .scene {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+        }
+        
+        .scene-content {
+            text-align: center;
+            padding: 60px;
+        }
+        
+        .logo-icon {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            font-weight: bold;
+            color: #fff;
+            margin: 0 auto 40px;
+        }
+        
+        .title {
+            font-size: 80px;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+        }
+        
+        .subtitle {
+            font-size: 36px;
+            color: var(--text-secondary);
+            margin-bottom: 60px;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+            margin-top: 40px;
+        }
+        
+        .feature-card {
+            background: var(--bg-secondary);
+            border: 1px solid #21262d;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .feature-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+        
+        .feature-desc {
+            font-size: 18px;
+            color: var(--text-secondary);
+        }
+        
+        .chart-demo {
+            width: 800px;
+            height: 400px;
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            border: 1px solid #21262d;
+            margin: 40px auto;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .chart-line {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            background: linear-gradient(180deg, transparent 0%, rgba(88, 166, 255, 0.3) 100%);
+        }
+        
+        .data-flow {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+        }
+        
+        .data-particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            opacity: 0.6;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            color: #fff;
+            padding: 20px 60px;
+            border-radius: 12px;
+            font-size: 28px;
+            font-weight: 600;
+            text-decoration: none;
+            margin-top: 40px;
+        }
+        
+        .highlight-text {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 20px 0;
+        }
+        
+        .stats-row {
+            display: flex;
+            justify-content: center;
+            gap: 80px;
+            margin: 40px 0;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 64px;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+        
+        .stat-label {
+            font-size: 20px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- HyperFrames composition root -->
+    <div id="root" data-composition-id="root" data-width="1920" data-height="1080" data-duration="40">
+    <!-- 场景1：开场 -->
+    <div class="scene" id="scene1">
+        <div class="scene-content">
+            <div class="logo-icon">AI</div>
+            <div class="title">AI智能投研平台</div>
+            <div class="subtitle">您的专业A股分析助手</div>
+            <div class="chart-demo">
+                <div class="data-flow" id="dataFlow1"></div>
+                <div class="chart-line"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 场景2：核心功能 -->
+    <div class="scene" id="scene2">
+        <div class="scene-content">
+            <div class="highlight-text">实时行情 · K线分析 · 资金流向</div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">📈</div>
+                    <div class="feature-title">实时行情</div>
+                    <div class="feature-desc">秒级数据更新，把握每一个交易机会</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <div class="feature-title">K线分析</div>
+                    <div class="feature-desc">多周期K线，MA均线辅助决策</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💰</div>
+                    <div class="feature-title">资金流向</div>
+                    <div class="feature-desc">主力动向，大单追踪</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 场景3：AI智能分析 -->
+    <div class="scene" id="scene3">
+        <div class="scene-content">
+            <div class="highlight-text">AI智能问答 · 深度分析</div>
+            <div class="chart-demo" style="width: 1000px; height: 500px;">
+                <div style="padding: 40px; text-align: left;">
+                    <div style="background: #1a1f2e; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                        <div style="color: var(--accent-blue); font-size: 18px; margin-bottom: 8px;">用户提问</div>
+                        <div style="color: var(--text-primary); font-size: 20px;">这只股票技术面怎么样？</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #1a1f2e, #0d1117); padding: 20px; border-radius: 12px; border-left: 4px solid var(--accent-green);">
+                        <div style="color: var(--accent-green); font-size: 18px; margin-bottom: 8px;">AI分析</div>
+                        <div style="color: var(--text-secondary); font-size: 18px; line-height: 1.6;">
+                            从技术指标来看，该股目前处于上升通道，MACD金叉形成，成交量温和放大，建议关注...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 场景4：宏观数据 -->
+    <div class="scene" id="scene4">
+        <div class="scene-content">
+            <div class="highlight-text">中美宏观 · 数据日历 · 智能提醒</div>
+            <div class="stats-row">
+                <div class="stat-item">
+                    <div class="stat-number">50+</div>
+                    <div class="stat-label">宏观指标</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">7×24</div>
+                    <div class="stat-label">数据更新</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">覆盖中美</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 场景5：热点追踪 -->
+    <div class="scene" id="scene5">
+        <div class="scene-content">
+            <div class="highlight-text">热门题材 · 强势股追踪</div>
+            <div class="feature-grid" style="grid-template-columns: repeat(2, 1fr); max-width: 1000px;">
+                <div class="feature-card">
+                    <div class="feature-icon">🔥</div>
+                    <div class="feature-title">热门题材</div>
+                    <div class="feature-desc">实时追踪市场热点，把握题材轮动</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⭐</div>
+                    <div class="feature-title">强势股排行</div>
+                    <div class="feature-desc">每日强势股榜单，发现领涨龙头</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 场景6：结尾 -->
+    <div class="scene" id="scene6">
+        <div class="scene-content">
+            <div class="logo-icon">AI</div>
+            <div class="title">AI智能投研平台</div>
+            <div class="subtitle">让数据驱动决策，让投资更智能</div>
+            <a href="#" class="cta-button">立即体验</a>
+        </div>
+    </div>
+    </div>
+
+    <script>
+        // 创建数据流粒子效果 - 使用确定性随机
+        function mulberry32(a) {
+            return function() {
+                var t = a += 0x6D2B79F5;
+                t = Math.imul(t ^ t >>> 15, t | 1);
+                t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            }
+        }
+        
+        const rand = mulberry32(12345);
+        
+        function createParticles(containerId, count) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            for (let i = 0; i < count; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'data-particle';
+                particle.style.left = (rand() * 100) + '%';
+                particle.style.top = (rand() * 100) + '%';
+                container.appendChild(particle);
+            }
+        }
+        
+        createParticles('dataFlow1', 50);
+        
+        // GSAP动画时间线
+        const tl = gsap.timeline({ paused: true });
+        
+        // 场景1：开场 (0-5秒)
+        tl.to('#scene1', { opacity: 1, duration: 0.5 }, 0)
+          .from('#scene1 .logo-icon', { scale: 0, rotation: -180, duration: 1, ease: 'back.out(1.7)' }, 0.2)
+          .from('#scene1 .title', { y: 50, opacity: 0, duration: 0.8, ease: 'power3.out' }, 0.5)
+          .from('#scene1 .subtitle', { y: 30, opacity: 0, duration: 0.6, ease: 'power2.out' }, 0.8)
+          .from('#scene1 .chart-demo', { scale: 0.8, opacity: 0, duration: 0.8, ease: 'power2.out' }, 1)
+          .to('#scene1', { opacity: 0, duration: 0.5 }, 4.5)
+          .set('#scene1', { visibility: 'hidden' }, 5);
+        
+        // 场景2：核心功能 (5-12秒)
+        tl.to('#scene2', { opacity: 1, duration: 0.5 }, 5)
+          .from('#scene2 .highlight-text', { y: 40, opacity: 0, duration: 0.7, ease: 'power3.out' }, 5.2)
+          .from('#scene2 .feature-card', { 
+              y: 60, 
+              opacity: 0, 
+              duration: 0.6, 
+              stagger: 0.15, 
+              ease: 'power2.out' 
+          }, 5.5)
+          .to('#scene2', { opacity: 0, duration: 0.5 }, 11.5)
+          .set('#scene2', { visibility: 'hidden' }, 12);
+        
+        // 场景3：AI智能分析 (12-19秒)
+        tl.to('#scene3', { opacity: 1, duration: 0.5 }, 12)
+          .from('#scene3 .highlight-text', { y: 40, opacity: 0, duration: 0.7, ease: 'power3.out' }, 12.2)
+          .from('#scene3 .chart-demo', { scale: 0.9, opacity: 0, duration: 0.8, ease: 'power2.out' }, 12.5)
+          .to('#scene3', { opacity: 0, duration: 0.5 }, 18.5)
+          .set('#scene3', { visibility: 'hidden' }, 19);
+        
+        // 场景4：宏观数据 (19-26秒)
+        tl.to('#scene4', { opacity: 1, duration: 0.5 }, 19)
+          .from('#scene4 .highlight-text', { y: 40, opacity: 0, duration: 0.7, ease: 'power3.out' }, 19.2)
+          .from('#scene4 .stat-item', { 
+              y: 50, 
+              opacity: 0, 
+              duration: 0.6, 
+              stagger: 0.2, 
+              ease: 'power2.out' 
+          }, 19.5)
+          .to('#scene4', { opacity: 0, duration: 0.5 }, 25.5)
+          .set('#scene4', { visibility: 'hidden' }, 26);
+        
+        // 场景5：热点追踪 (26-33秒)
+        tl.to('#scene5', { opacity: 1, duration: 0.5 }, 26)
+          .from('#scene5 .highlight-text', { y: 40, opacity: 0, duration: 0.7, ease: 'power3.out' }, 26.2)
+          .from('#scene5 .feature-card', { 
+              y: 60, 
+              opacity: 0, 
+              duration: 0.6, 
+              stagger: 0.2, 
+              ease: 'power2.out' 
+          }, 26.5)
+          .to('#scene5', { opacity: 0, duration: 0.5 }, 32.5)
+          .set('#scene5', { visibility: 'hidden' }, 33);
+        
+        // 场景6：结尾 (33-40秒)
+        tl.to('#scene6', { opacity: 1, duration: 0.5 }, 33)
+          .from('#scene6 .logo-icon', { scale: 0, rotation: 180, duration: 1, ease: 'back.out(1.7)' }, 33.2)
+          .from('#scene6 .title', { y: 50, opacity: 0, duration: 0.8, ease: 'power3.out' }, 33.5)
+          .from('#scene6 .subtitle', { y: 30, opacity: 0, duration: 0.6, ease: 'power2.out' }, 33.8)
+          .from('#scene6 .cta-button', { scale: 0, opacity: 0, duration: 0.6, ease: 'back.out(1.7)' }, 34.5);
+        
+        // 注册时间线
+        window.__timelines = window.__timelines || {};
+        window.__timelines['root'] = tl;
+        
+        // 自动播放预览
+        tl.play();
+    </script>
+</body>
+</html>

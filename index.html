@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI花哥 · 赛博中枢 | A股每日复盘 · AI投研 · GIF表情包 · 古诗词视频</title>
+<link rel="canonical" href="https://aifupang.com/">
+<meta name="baidu-site-verification" content="codeva-8dRVUortj8">
+<meta name="description" content="AI花哥 · 10年私募副总，分享A股每日复盘、AI智能投研、GIF表情包制作、古诗词视频生成、AI创作工坊、电视直播。汇集FLUX图片、Wan2.1视频、TTS语音合成等AI工具。">
+<meta name="keywords" content="AI花哥,花哥不花,A股复盘,A股投研,AI投研,GIF表情包,古诗词,视频生成,AI视频,FLUX,Wan2.1,TTS,AI创作,电视直播,赛博朋克">
+<meta property="og:title" content="AI花哥 · 赛博中枢 | A股每日复盘 · AI投研 · GIF表情包">
+<meta property="og:description" content="10年私募副总视角，A股每日复盘、AI智能投研、GIF表情包制作、古诗词视频生成、AI创作工坊。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aifupang.com/">
+<meta property="og:site_name" content="AI花哥 · 赛博中枢">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI花哥 · 赛博中枢 | A股每日复盘 · AI投研">
+<meta name="twitter:description" content="10年私募副总视角，A股每日复盘、AI智能投研、GIF表情包制作、古诗词视频生成。">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "AI花哥 · 赛博中枢",
+  "url": "https://aifupang.com/",
+  "description": "A股每日复盘、AI智能投研、GIF表情包制作、古诗词视频生成、AI创作工坊",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "https://aifupang.com/search?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "AI花哥（花哥不花）",
+  "url": "https://aifupang.com/",
+  "description": "10年私募副总，AI工具实践者",
+  "knowsAbout": ["A股投资", "AI工具", "视频生成", "古诗词"]
+}
+</script>
+<style>
+  :root {
+    --bg: #050507;
+    --card: #101010;
+    --border: #3d3a39;
+    --green: #00d992;
+    --green-dim: rgba(0, 217, 146, 0.08);
+    --green-glow: rgba(0, 217, 146, 0.3);
+    --text: #f2f2f2;
+    --text2: #b8b3b0;
+    --text3: #8b949e;
+    --gold: #fbbf24;
+    --cyan: #22d3ee;
+    --purple: #a78bfa;
+    --rose: #fb7185;
+    --radius: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(30, 41, 59, 0.3) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(30, 41, 59, 0.3) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* === HEADER === */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(5, 5, 7, 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+  }
+  .header-inner {
+    max-width: 1200px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 56px;
+  }
+  .logo {
+    font-size: 20px; font-weight: 700; color: var(--green);
+    display: flex; align-items: center; gap: 8px;
+    text-decoration: none;
+  }
+  .logo-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s ease-in-out infinite;
+    box-shadow: 0 0 8px var(--green-glow);
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.5); }
+  }
+  .nav-links { display: flex; gap: 24px; }
+  .nav-links a {
+    color: var(--text2); text-decoration: none; font-size: 14px;
+    transition: color 0.2s; font-weight: 500;
+  }
+  .nav-links a:hover { color: var(--green); }
+
+  /* === HERO === */
+  .hero {
+    position: relative; z-index: 1;
+    text-align: center; padding: 80px 20px 60px;
+  }
+  .hero h1 {
+    font-size: clamp(32px, 6vw, 56px); font-weight: 400;
+    line-height: 1.1; letter-spacing: -0.5px;
+    color: var(--text); margin-bottom: 16px;
+  }
+  .hero h1 .hl { color: var(--green); }
+  .hero p {
+    font-size: 16px; color: var(--text2); max-width: 520px;
+    margin: 0 auto 32px; line-height: 1.6;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 16px; border-radius: 20px;
+    border: 1px solid rgba(0, 217, 146, 0.25);
+    background: var(--green-dim);
+    color: var(--green); font-size: 13px; font-weight: 500;
+  }
+
+  /* === MODULE GRID === */
+  .modules {
+    position: relative; z-index: 1;
+    max-width: 1000px; margin: 0 auto; padding: 0 20px 60px;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  @media (max-width: 900px) { .modules { grid-template-columns: repeat(3, 1fr); } } @media (max-width: 640px) { .modules { grid-template-columns: 1fr; } }
+
+  .module-card {
+    display: flex; flex-direction: column; height: 100%;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 28px;
+    text-decoration: none; color: var(--text);
+    transition: all 0.3s ease;
+    position: relative; overflow: hidden;
+    cursor: pointer;
+    
+  }
+  .module-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; background: var(--border);
+    transition: background 0.3s;
+  }
+  .module-card:hover {
+    border-color: rgba(255,255,255,0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .module-card:hover::before { background: var(--green); }
+
+  .module-icon { font-size: 32px; margin-bottom: 12px; }
+  .module-card .card-body { flex: 1; }
+.module-card h3 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .card-spacer { flex: 1; }
+  .module-card .desc { font-size: 13px; color: var(--text3); line-height: 1.5; }
+  .module-card .tag {
+    display: inline-block; margin-top: 12px; padding: 3px 10px;
+    border-radius: 12px; font-size: 11px; font-weight: 600;
+    font-family: monospace;
+  }
+
+  /* Card accent colors */
+  .card-research .module-card:hover::before { background: var(--cyan); }
+  .card-research .tag { background: rgba(0, 217, 146, 0.12); color: var(--cyan); }
+
+    .card-stock .module-card:hover::before { background: var(--gold); }
+  .card-stock .tag { background: rgba(251, 191, 36, 0.12); color: var(--gold); }
+  .card-gif .module-card:hover::before { background: var(--rose); }
+  .card-gif .tag { background: rgba(244, 114, 182, 0.12); color: var(--rose); }
+  .card-poetry .module-card:hover::before { background: var(--cyan); }
+  .card-poetry .tag { background: rgba(34, 211, 238, 0.12); color: var(--cyan); }
+  .card-video .module-card:hover::before { background: var(--purple); }
+  .card-video .tag { background: rgba(167, 139, 250, 0.12); color: var(--purple); }
+  .card-more .module-card:hover::before { background: var(--rose); }
+  .card-more .tag { background: rgba(251, 113, 133, 0.12); color: var(--rose); }
+
+  /* === STATUS BAR === */
+  .status-bar {
+    position: relative; z-index: 1;
+    max-width: 1000px; margin: 0 auto 60px; padding: 0 20px;
+    display: flex; gap: 24px; flex-wrap: wrap; justify-content: center;
+  }
+  .status-item {
+    padding: 12px 20px; border: 1px solid var(--border);
+    border-radius: var(--radius); background: var(--card);
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: var(--text2);
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .status-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green-glow); }
+
+  /* === FOOTER === */
+  footer {
+    position: relative; z-index: 1;
+    text-align: center; padding: 40px 20px;
+    border-top: 1px solid var(--border);
+    color: var(--text3); font-size: 12px;
+  }
+  footer span { color: var(--green); }
+@media(max-width:768px){
+body{padding:0;font-size:14px}
+header{padding:0 12px}
+.h-inner{height:48px}
+.logo{font-size:16px}
+.container{padding:20px 12px}
+h1{font-size:20px}
+.grid{grid-template-columns:1fr!important;gap:12px}
+.card{min-height:auto;padding:16px}
+.stats-row{grid-template-columns:1fr 1fr!important}
+.chart-row{grid-template-columns:1fr!important}
+.stat-card .value{font-size:24px}
+.stat-card{padding:14px}
+table{font-size:11px}
+th,td{padding:6px 8px}
+.btn{padding:8px 20px;font-size:13px}
+nav a{font-size:12px;padding:4px 8px}
+.btns{flex-wrap:wrap;gap:8px}
+.controls{flex-direction:column;align-items:flex-start}
+.preview-wrap canvas{max-width:100%!important}
+canvas{max-width:100%}
+.area{padding:30px 16px}
+.area .icon{font-size:36px}
+.area .txt{font-size:13px}
+.login-box{margin:40px 12px;padding:32px 20px}
+footer{padding:24px 12px;margin-top:32px}
+}</style>
+<link rel="canonical" href="https://aifupang.com">
+<meta property="og:title" content="AI花哥 · 赛博中枢 - AI工具集 ·  古诗词视频生成">
+<meta property="og:description" content="AI花哥（花哥不花），10年私募副总视角，分享AI工具应用、A股每日复盘、古诗词视频生成、AI视觉创作。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aifupang.com">
+<meta property="og:site_name" content="AI花哥">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI花哥 · 赛博中枢">
+<meta name="twitter:description" content="AI花哥（花哥不花），10年私募副总视角，分享AI工具应用、A股每日复盘、古诗词视频生成。">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "AI花哥 · 赛博中枢",
+  "url": "https://aifupang.com",
+  "description": "AI花哥（花哥不花），10年私募副总视角，分享AI工具应用、A股每日复盘、古诗词视频生成、AI视觉创作。汇集FLUX图片生成、Wan2.1视频生成、TTS语音合成等AI工具。"
+}
+</script>
+<!-- Google tag (gtag.js) -->
+<script async src=\https://www.googletagmanager.com/gtag/js?id=G-GEF5QPMJR6\></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-GEF5QPMJR6');
+</script>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="/" class="logo">
+      <span class="logo-dot"></span>AI花哥
+    </a>
+    <nav class="nav-links">
+      <a href="/research/">研究</a>
+      <a href="/review/">复盘</a>
+      <a href="/poetry/">诗词</a>
+      <a href="/lawyer/">法律</a>
+      <a href="/studio/">视频</a>
+      <a href="/tv/">电视</a>
+      <a href="/music/">音乐</a>
+      <a href="/blog/">博客</a>
+      <a href="/moments/">狼狈</a>
+      <a href="/calc/">计算器</a>
+      <a href="/more/">工具、游戏集</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-badge">
+    <span class="logo-dot" style="width:6px;height:6px;"></span>
+    10年私募副总 · AI应用观察
+  </div>
+  <h1>
+    用<span class="hl">AI</span>重构<br>信息获取方式
+  </h1>
+  <p>
+    每日复盘、小学古诗词、AI视频创作、网页游戏——一个赛博中枢，连接所有数字工具。
+  </p>
+
+<div class="status-bar">
+  <div class="status-item">
+    <span class="status-dot online"></span> 服务在线
+  </div>
+  <div class="status-item">
+    📅 <span id="today-date"></span>
+  </div>
+  <div class="status-item">
+    🤖 DeepSeek V4
+  </div>
+</div>
+
+<section class="modules">
+
+    <!-- A股投研数据 -->
+  <div style="--accent: var(--purple)">
+    <a href="/research/" class="module-card">
+      <div class="card-body"><div class="module-icon">📈</div>
+      <h3>A股投研数据</h3>
+      <div class="desc">实时行情 · 研报检索 · 龙虎榜 · AI智能分析</div>
+      </div><div class="card-spacer"></div><span class="tag">RESEARCH</span>
+    </a>
+  </div>
+
+<!-- A股复盘 -->
+  <div class="card-stock">
+    <a href="/review/" class="module-card">
+      <div class="card-body"><div class="module-icon">📊</div>
+      <h3>A股每日复盘</h3>
+      <div class="desc">技术面 · 资金面 · 消息面，私募视角拆解行情</div>
+      </div><div class="card-spacer"></div><span class="tag">STOCK</span>
+    </a>
+  </div>
+
+<!-- GIF表情包 -->
+  <div class=card-gif>
+    <a href=/gif/ class=module-card>
+      <div class=card-body><div class=module-icon>🎞️</div>
+      <h3>GIF表情包</h3>
+      <div class=desc>拍照/上传 → 自动抠图 → 生成GIF动图表情包</div>
+      </div><div class=card-spacer></div><span class=tag>GIF</span>
+    </a>
+  </div>
+
+  <!-- 小学必背古诗词 -->
+  <div class="card-poetry">
+    <a href="/poetry/" class="module-card">
+      <div class="card-body"><div class="module-icon">📜</div>
+      <h3>小学必背古诗词</h3>
+      <div class="desc">75首必背诗词，注音+译文+赏析</div>
+      </div><div class="card-spacer"></div><span class="tag">POETRY</span>
+    </a>
+  </div>
+
+  
+  <!-- 电视直播 -->
+  <div style="--accent: var(--green)">
+    <a href="/tv/" class="module-card">
+      <div class="card-body"><div class="module-icon">📺</div>
+      <h3>电视直播</h3>
+      <div class="desc">B站直播间合集，侧边栏一键切换</div>
+      </div><div class="card-spacer"></div><span class="tag">LIVE</span>
+    </a>
+  </div>
+<!-- AI创作工坊 -->
+  <div class="card-video">
+    <a href="/studio/" class="module-card">
+      <div class="card-body"><div class="module-icon">🎬</div>
+      <h3>AI创作工坊</h3>
+      <div class="desc">会员专属 · AI视频/图片/语音生成</div>
+      </div><div class="card-spacer"></div><span class="tag">STUDIO</span>
+    </a>
+  </div>
+
+  <!-- 工具、游戏集 -->
+  <div class="card-more">
+    <a href="/more/" class="module-card">
+      <div class="card-body"><div class="module-icon">🎮</div>
+      <h3>工具、游戏集</h3>
+      <div class="desc">网页小游戏 · AI工具 · 创意实验</div>
+      </div><div class="card-spacer"></div><span class="tag">MORE</span>
+    </a>
+  </div>
+  <!-- 综合计算器 -->
+  <div style="--accent: var(--cyan)">
+    <a href="/calc/" class="module-card">
+      <div class="card-body"><div class="module-icon">🧮</div>
+      <h3>综合计算器</h3>
+      <div class="desc">保险 · 贷款 · 法律费用，一键计算</div>
+      </div><div class="card-spacer"></div><span class="tag">CALC</span>
+    </a>
+  </div>
+
+<!-- 音乐 -->
+  <div class="card-poetry" style="">
+    <a href="/music/" class="module-card">
+      <div class="card-body"><div class="module-icon">🎵</div>
+      <h3>音乐作品集</h3>
+      <div class="desc">Suno AI 原创，中国风·古风·史诗</div>
+      </div><div class="card-spacer"></div><span class="tag">MUSIC</span>
+    </a>
+  </div>
+
+  <!-- 博客 -->
+  <div style="--accent: var(--purple)">
+    <a href="/blog/" class="module-card">
+      <div class="card-body"><div class="module-icon">📝</div>
+      <h3>文章博客</h3>
+      <div class="desc">私募视角 · AI×金融 · 趋势洞察</div>
+      </div><div class="card-spacer"></div><span class="tag">BLOG</span>
+    </a>
+  </div>
+
+  <!-- 家庭法律助手 -->
+  <div style="--accent: var(--gold)">
+    <a href="/lawyer/" class="module-card">
+      <div class="card-body"><div class="module-icon">⚖️</div>
+      <h3>家庭法律助手</h3>
+      <div class="desc">婚姻、劳动、借贷、租房——法律问题快速分流</div>
+      </div><div class="card-spacer"></div><span class="tag">LEGAL</span>
+    </a>
+  </div>
+
+  <!-- 生活狼狈时刻 -->
+  <div style="--accent: var(--rose)">
+    <a href="/moments/" class="module-card">
+      <div class="card-body"><div class="module-icon">😂</div>
+      <h3>生活狼狈时刻</h3>
+      <div class="desc">分享你的尴尬、翻车、社死瞬间</div>
+      </div><div class="card-spacer"></div><span class="tag">MOMENTS</span>
+    </a>
+  </div>
+</section>
+
+  
+
+<footer>
+  © 2026 <span>花哥不花</span> · 10年私募副总视角 · 抖音号 731295726
+</footer>
+
+<script>
+  document.getElementById('today-date').textContent =
+    new Date().toLocaleDateString('zh-CN', {year:'numeric',month:'long',day:'numeric',weekday:'short'});
+</script>
+</body>
+</html>
+

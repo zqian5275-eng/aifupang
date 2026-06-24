@@ -1,0 +1,497 @@
+from flask import Flask, render_template, jsonify, request
+import stock_data
+import traceback
+import requests
+import json
+
+app = Flask(__name__)
+
+# ============ AI 配置 ============
+AI_API_KEY = "sk-MWFOIA8F2K2gTLMWsp5cwAaYapEXn4HPNkWAEheH9ynow6oL"
+AI_API_URL = "https://apihub.agnes-ai.com/v1/chat/completions"
+AI_MODEL = "agnes-2.0-flash"
+
+
+def _normalize_code(code):
+    """统一股票代码格式"""
+    code = code.upper().replace('SH', '').replace('SZ', '').replace('BJ', '')
+    if code.startswith('6'):
+        return 'sh' + code
+    elif code.startswith('0') or code.startswith('3'):
+        return 'sz' + code
+    else:
+        return 'sz' + code
+
+
+# ============ 页面路由 ============
+@app.route('/')
+def index():
+    # 服务端预加载热门数据，避免客户端JS加载失败
+    hot_stocks = []
+    hot_sectors = []
+    try:
+        from stock_data import get_hot_stocks, get_sector_trend
+        hot_stocks = get_hot_stocks()[:10] if callable(get_hot_stocks) else []
+        hot_sectors = get_sector_trend()[:15] if callable(get_sector_trend) else []
+    except Exception as e:
+        print(f'[WARN] 首页预加载失败: {e}')
+    return render_template('index.html', hot_stocks=hot_stocks, hot_sectors=hot_sectors)
+
+
+# ============ 行情 API ============
+@app.route('/api/quote/<code>')
+def quote(code):
+    try:
+        full_code = _normalize_code(code)
+        result = stock_data.parse_tencent_quote(full_code)
+        if result:
+            result['full_code'] = full_code
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/kline/<code>')
+def kline(code):
+    try:
+        full_code = _normalize_code(code)
+        days = request.args.get('days', 60, type=int)
+        result = stock_data.get_kline(full_code, days)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/sectors/<code>')
+def sectors(code):
+    try:
+        full_code = _normalize_code(code)
+        result = stock_data.get_sectors(full_code)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/fundflow/<code>')
+def fundflow(code):
+    try:
+        full_code = _normalize_code(code)
+        days = request.args.get('days', 10, type=int)
+        result = stock_data.get_fund_flow(full_code, days)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/fundflow120/<code>')
+def fundflow120(code):
+    try:
+        full_code = _normalize_code(code)
+        result = stock_data.get_fund_flow_120d(full_code)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/search')
+def search():
+    try:
+        keyword = request.args.get('q', '').strip()
+        if len(keyword) < 1:
+            return jsonify({'success': False, 'error': '请输入股票代码或名称'})
+        result = stock_data.search_stock(keyword)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/valuation/<code>')
+def valuation(code):
+    try:
+        full_code = _normalize_code(code)
+        result = stock_data.get_valuation(full_code)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/signals/<code>')
+def signals(code):
+    try:
+        sig_type = request.args.get('type', 'hot')
+        if sig_type == 'hot':
+            result = stock_data.get_hot_stocks()
+        elif sig_type == 'northbound':
+            result = stock_data.get_northbound()
+        elif sig_type == 'dragon_tiger':
+            result = stock_data.get_dragon_tiger()
+        elif sig_type == 'restriction':
+            full_code = _normalize_code(code)
+            result = stock_data.get_restriction_alert(full_code)
+        elif sig_type == 'block_trade':
+            full_code = _normalize_code(code)
+            result = stock_data.get_block_trade(full_code)
+        elif sig_type == 'sector_trend':
+            result = stock_data.get_sector_trend()
+        else:
+            result = stock_data.get_hot_stocks()
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/fundmargin/<code>')
+def fundmargin(code):
+    try:
+        full_code = _normalize_code(code)
+        result = stock_data.get_margin_data(full_code)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/financial/<code>')
+def financial(code):
+    try:
+        code_num = code.upper().replace('SH', '').replace('SZ', '').replace('BJ', '')
+        table_type = request.args.get('type', 'income')
+        result = stock_data.get_financial_table(code_num, table_type)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/announcement/<code>')
+def announcement(code):
+    try:
+        full_code = _normalize_code(code)
+        result = stock_data.get_announcements(full_code)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/news/<code>')
+def news(code):
+    try:
+        full_code = _normalize_code(code)
+        news_type = request.args.get('type', 'individual')
+        if news_type == 'individual':
+            result = stock_data.get_individual_news(full_code)
+        else:
+            result = stock_data.get_global_news()
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/holder/<code>')
+def holder(code):
+    try:
+        full_code = _normalize_code(code)
+        result = stock_data.get_holder_num(full_code)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/dividend/<code>')
+def dividend(code):
+    try:
+        full_code = _normalize_code(code)
+        result = stock_data.get_dividend(full_code)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/reports/<code>')
+def reports(code):
+    try:
+        full_code = _normalize_code(code)
+        result = stock_data.get_reports(full_code)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/multi-quote')
+def multi_quote():
+    try:
+        codes = request.args.get('codes', '').split(',')
+        results = []
+        for code in codes:
+            code = code.strip().upper().replace('SH', '').replace('SZ', '').replace('BJ', '')
+            if not code:
+                continue
+            if code.startswith('6'):
+                full_code = 'sh' + code
+            elif code.startswith('0') or code.startswith('3'):
+                full_code = 'sz' + code
+            else:
+                full_code = 'sz' + code
+            r = stock_data.parse_tencent_quote(full_code)
+            if r:
+                r['full_code'] = full_code
+                results.append(r)
+        return jsonify({'success': True, 'data': results})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# ============ AI 智能引导 API ============
+@app.route('/api/ai/chat', methods=['POST'])
+def ai_chat():
+    try:
+        data = request.get_json() or {}
+        messages = data.get('messages', [])
+        current_stock = data.get('current_stock', '')
+        
+        if not messages:
+            return jsonify({'success': False, 'error': '消息不能为空'})
+        
+        # 构建系统提示词
+        system_prompt = """你是一位专业的A股投研分析师，擅长技术分析、基本面分析和市场情绪分析。
+
+你的能力包括：
+1. 解读K线形态、均线排列、成交量变化
+2. 分析资金流向（主力、大单、散户）
+3. 评估估值水平（PE、PB、PEG）
+4. 跟踪市场热点和题材概念
+5. 解读龙虎榜、融资融券、大宗交易等信号
+6. 分析财务报表（利润表、资产负债表、现金流量表）
+7. 评估解禁、分红、股东户数变化等事件影响
+
+回答风格：
+- 专业但不晦涩，用通俗语言解释复杂概念
+- 数据驱动，引用具体数字支撑观点
+- 风险提示明确，不给出绝对买卖建议
+- 结构化输出，使用markdown格式
+
+当前分析的股票代码：""" + (current_stock if current_stock else "未指定")
+        
+        # 构建请求体
+        api_messages = [{"role": "system", "content": system_prompt}]
+        for msg in messages:
+            api_messages.append({
+                "role": msg.get('role', 'user'),
+                "content": msg.get('content', '')
+            })
+        
+        payload = {
+            "model": AI_MODEL,
+            "messages": api_messages,
+            "temperature": 0.7,
+            "max_tokens": 2000
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {AI_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        r = requests.post(AI_API_URL, json=payload, headers=headers, timeout=120)
+        
+        if r.status_code == 200:
+            ai_response = r.json()
+            content = ai_response.get('choices', [{}])[0].get('message', {}).get('content', '')
+            return jsonify({'success': True, 'data': {'content': content}})
+        else:
+            return jsonify({'success': False, 'error': f'AI服务错误: {r.status_code}'})
+            
+    except requests.exceptions.Timeout:
+        return jsonify({'success': False, 'error': 'AI分析超时（120秒），Agnes AI服务可能繁忙，请稍后重试'})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/ai/analyze', methods=['POST'])
+def ai_analyze():
+    """AI一键分析当前股票"""
+    try:
+        data = request.get_json() or {}
+        code = data.get('code', '')
+        stock_data_json = data.get('stock_data', {})
+        
+        if not code:
+            return jsonify({'success': False, 'error': '股票代码不能为空'})
+        
+        # 获取当前真实日期
+        from datetime import datetime
+        today_str = datetime.now().strftime('%Y年%m月%d日')
+        current_year = datetime.now().year
+
+        prompt = f"""请对股票 {code} 进行全面的投研分析。
+
+当前日期：{today_str}（{current_year}年）
+当前数据：
+{json.dumps(stock_data_json, ensure_ascii=False, indent=2)}
+
+请从以下维度进行分析：
+1. **技术面**：K线形态、均线系统、成交量、支撑压力位
+2. **资金面**：主力资金流向、大单动向、融资融券余额变化
+3. **估值面**：PE/PB水平、与行业对比、历史分位
+4. **消息面**：近期新闻、公告、题材概念催化
+5. **风险点**：解禁、大宗交易、股东户数变化等
+6. **综合评级**：给出谨慎/中性/乐观的倾向性判断（非投资建议）
+
+请用markdown格式输出，包含具体数据引用。直接分析，不要加任何关于"数据时效性"、"模拟推演"、"未来时间"的声明或免责声明。"""
+
+        payload = {
+            "model": AI_MODEL,
+            "messages": [
+                {"role": "system", "content": f"你是一位专业的A股投研分析师。当前真实日期是{today_str}（{current_year}年）。你的知识库可能截止到较早时间，但请假设今天是{today_str}，基于用户提供的实时数据进行分析。严禁在回复中添加任何关于'数据时效性'、'模拟推演'、'未来时间'、'训练数据截止'的声明或免责声明。直接给出专业分析即可。"},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 3000
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {AI_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        r = requests.post(AI_API_URL, json=payload, headers=headers, timeout=120)
+        
+        if r.status_code == 200:
+            ai_response = r.json()
+            content = ai_response.get('choices', [{}])[0].get('message', {}).get('content', '')
+            return jsonify({'success': True, 'data': {'content': content}})
+        else:
+            return jsonify({'success': False, 'error': f'AI服务错误: {r.status_code}'})
+            
+    except requests.exceptions.Timeout:
+        return jsonify({'success': False, 'error': 'AI分析超时（120秒），Agnes AI服务可能繁忙，请稍后重试'})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# ============ 宏观数据 API ============
+@app.route('/api/macro')
+def macro():
+    """获取宏观数据"""
+    try:
+        data_type = request.args.get('type', 'china')
+        if data_type == 'china':
+            result = stock_data.get_macro_china()
+        elif data_type == 'usa':
+            result = stock_data.get_macro_usa()
+        elif data_type == 'calendar':
+            result = stock_data.get_macro_calendar()
+        else:
+            result = stock_data.get_macro_china()
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/ai/macro', methods=['POST'])
+def ai_macro():
+    """AI分析宏观数据"""
+    try:
+        data = request.get_json() or {}
+        macro_data = data.get('macro_data', {})
+        indicator = data.get('indicator', '宏观数据')
+        
+        if not macro_data:
+            return jsonify({'success': False, 'error': '宏观数据不能为空'})
+        
+        # 提取最新值、前值、预期值，确保AI能进行对比分析
+        data_rows = macro_data.get('data', [])
+        latest_val = prev_val = forecast_val = None
+        if data_rows and len(data_rows) > 0:
+            latest = data_rows[0]
+            latest_val = latest.get('value')
+            prev_val = latest.get('previous')
+            forecast_val = latest.get('forecast')
+            if prev_val is None and len(data_rows) > 1:
+                prev_val = data_rows[1].get('value')
+
+        compare_info = ""
+        if latest_val is not None:
+            compare_info += f"\n最新值: {latest_val}"
+        if prev_val is not None:
+            compare_info += f"\n前值: {prev_val}"
+            if latest_val is not None:
+                change = latest_val - prev_val
+                compare_info += f" (较前值变化: {change:+.2f})"
+        if forecast_val is not None:
+            compare_info += f"\n市场预期: {forecast_val}"
+            if latest_val is not None:
+                diff = latest_val - forecast_val
+                compare_info += f" (实际值较预期: {diff:+.2f}, {'高于' if diff > 0 else '低于' if diff < 0 else '符合'}预期)"
+
+        prompt = f"""请对以下{macro_data.get('country', '中国')}{indicator}数据进行专业分析。
+
+数据详情：
+{json.dumps(macro_data, ensure_ascii=False, indent=2)}
+
+关键对比数据：{compare_info}
+
+请从以下维度分析，**重点突出与预期值、前值的对比**：
+1. **数据解读**：最新数值的含义，与市场预期（forecast）和前值（previous）的具体对比，是超预期、低于预期还是符合预期
+2. **趋势分析**：近期走势方向，关键转折点，连续多期的变化趋势
+3. **政策含义**：对货币政策、财政政策的潜在影响
+4. **市场影响**：对股市、债市、汇市的影响路径
+5. **投资启示**：对资产配置的参考意义（非投资建议）
+
+请用markdown格式输出，语言专业且通俗易懂。"""
+        
+        # 获取当前真实日期，避免AI模型因训练数据截止时间产生时间混淆
+        from datetime import datetime
+        today_str = datetime.now().strftime('%Y年%m月%d日')
+
+        payload = {
+            "model": AI_MODEL,
+            "messages": [
+                {"role": "system", "content": f"你是一位专业的宏观经济分析师，擅长解读中美宏观经济数据。今天是{today_str}，请基于这个真实日期进行分析，不要质疑数据日期。"},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 3000
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {AI_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        r = requests.post(AI_API_URL, json=payload, headers=headers, timeout=120)
+        
+        if r.status_code == 200:
+            ai_response = r.json()
+            content = ai_response.get('choices', [{}])[0].get('message', {}).get('content', '')
+            return jsonify({'success': True, 'data': {'content': content}})
+        else:
+            return jsonify({'success': False, 'error': f'AI服务错误: {r.status_code}'})
+            
+    except requests.exceptions.Timeout:
+        return jsonify({'success': False, 'error': 'AI分析超时（120秒），Agnes AI服务可能繁忙，请稍后重试'})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+if __name__ == '__main__':
+    print('启动 a-stock-data AI智能投研平台...')
+    print('打开浏览器访问: http://127.0.0.1:5000')
+    app.run(host='0.0.0.0', port=5001, debug=False)

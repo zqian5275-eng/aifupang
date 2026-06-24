@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""TV Live Proxy v3 - 使用公开 m3u8 流源"""
+import os, shutil
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+CHANNELS = [
+    # 央视官方流（来自 CCTV+）
+    {"id": "cctvplus1", "name": "CCTV+ 综合", "url": "https://cd-live-stream.news.cctvplus.com/live/smil:CHANNEL1.smil/playlist.m3u8", "group": "央视官方"},
+    {"id": "cctvplus2", "name": "CCTV+ 新闻", "url": "https://cd-live-stream.news.cctvplus.com/live/smil:CHANNEL2.smil/playlist.m3u8", "group": "央视官方"},
+    # 卫视
+    {"id": "beijing", "name": "北京卫视", "url": "http://go.bkpcp.top/mg/bjws", "group": "卫视"},
+    # 海外中文台
+    {"id": "abn", "name": "ABN China", "url": "https://mediaserver.abnvideos.com/streams/abnchina.m3u8", "group": "海外中文"},
+    {"id": "angel", "name": "Angel TV 中文", "url": "https://janya-digimix.akamaized.net/vglive-sk-999451/chinese/ngrp:angelchinese_all/playlist.m3u8", "group": "海外中文"},
+    # 海外公开 CCTV 源（来源不稳定）
+    {"id": "cctv1_se", "name": "CCTV-1 (海外源)", "url": "http://69.30.245.50/live/cctv1.m3u8", "group": "海外CCTV"},
+    {"id": "cctv2_se", "name": "CCTV-2 (海外源)", "url": "http://74.91.26.218:82/live/cctv2hd.m3u8", "group": "海外CCTV"},
+    {"id": "cctv3_se", "name": "CCTV-3 (海外源)", "url": "http://74.91.26.218:82/live/cctv3hd.m3u8", "group": "海外CCTV"},
+    {"id": "cctv6_se", "name": "CCTV-6 (海外源)", "url": "http://198.204.240.250:82/live/cctv6.m3u8", "group": "海外CCTV"},
+    {"id": "cctv7_se", "name": "CCTV-7 (海外源)", "url": "http://74.91.26.218:82/live/cctv7hd.m3u8", "group": "海外CCTV"},
+]
+
+@app.route('/api/channels')
+def list_channels():
+    return jsonify(CHANNELS)
+
+@app.route('/api/play/<channel_id>')
+def play(channel_id):
+    for ch in CHANNELS:
+        if ch['id'] == channel_id:
+            return jsonify({'success': True, 'url': ch['url'], 'name': ch['name']})
+    return jsonify({'error': '频道不存在'}), 404
+
+if __name__ == '__main__':
+    app.run(host='127.0.0.1', port=8765, debug=False)

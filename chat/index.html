@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>AI聊天 · AI花哥</title>
+<style>
+:root{--bg:#050507;--card:#101010;--border:#3d3a39;--green:#00d992;--cyan:#22d3ee;--text:#f2f2f2;--text2:#b8b3b0;--text3:#8b949e;--user-bg:rgba(0,217,146,.08);--ai-bg:rgba(34,211,238,.06)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:system-ui,'PingFang SC','Microsoft YaHei',sans-serif;height:100vh;display:flex;flex-direction:column}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(30,41,59,.3)1px,transparent 1px),linear-gradient(90deg,rgba(30,41,59,.3)1px,transparent 1px);background-size:60px 60px}
+header{position:sticky;top:0;z-index:100;background:rgba(5,5,7,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 24px}
+.header-inner{max-width:100%;display:flex;align-items:center;justify-content:space-between;height:48px}
+.logo{font-size:18px;font-weight:700;color:var(--green);text-decoration:none;display:flex;align-items:center;gap:6px}
+.logo-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;box-shadow:0 0 6px rgba(0,217,146,.3)}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}
+.header-actions{display:flex;gap:8px;align-items:center}
+.header-actions a,.header-actions button{color:var(--text2);text-decoration:none;font-size:12px;background:none;border:1px solid var(--border);padding:4px 12px;border-radius:4px;cursor:pointer;font-family:inherit}
+.header-actions a:hover,.header-actions button:hover{color:var(--green);border-color:var(--green)}
+
+.chat-container{flex:1;overflow-y:auto;padding:20px;position:relative;z-index:1;max-width:800px;margin:0 auto;width:100%}
+.msg{margin-bottom:16px;display:flex;gap:10px}
+.msg.user{flex-direction:row-reverse}
+.msg-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.msg.user .msg-avatar{background:var(--green-dim);border:1px solid rgba(0,217,146,.2)}
+.msg.ai .msg-avatar{background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2)}
+.msg-bubble{max-width:75%;padding:12px 16px;border-radius:12px;font-size:14px;line-height:1.6;word-break:break-word}
+.msg.user .msg-bubble{background:var(--user-bg);border:1px solid rgba(0,217,146,.15);border-radius:12px 12px 4px 12px}
+.msg.ai .msg-bubble{background:var(--ai-bg);border:1px solid rgba(34,211,238,.1);border-radius:12px 12px 12px 4px}
+
+.input-area{position:relative;z-index:1;padding:16px 20px;border-top:1px solid var(--border);background:rgba(5,5,7,.95)}
+.input-inner{max-width:800px;margin:0 auto;display:flex;gap:8px}
+.input-inner textarea{flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:12px;font-size:14px;font-family:inherit;resize:none;outline:none;min-height:44px;max-height:120px}
+.input-inner textarea:focus{border-color:var(--green)}
+.input-inner button{padding:12px 20px;background:var(--green);border:none;border-radius:8px;color:var(--bg);font-weight:600;cursor:pointer;font-size:14px;font-family:inherit;white-space:nowrap}
+.input-inner button:hover{box-shadow:0 0 16px rgba(0,217,146,.3)}
+.input-inner button:disabled{opacity:.5;cursor:not-allowed}
+
+.api-config{max-width:800px;margin:0 auto 12px;display:flex;gap:8px;align-items:center}
+.api-config input{flex:1;background:var(--card);border:1px solid var(--border);border-radius:4px;color:var(--text2);padding:6px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;outline:none}
+.api-config input:focus{border-color:var(--cyan)}
+.api-config .saved{color:var(--green);font-size:11px;white-space:nowrap}
+
+.typing{display:flex;gap:6px;padding:12px 16px}.typing span{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:blink 1.4s infinite}.typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}@keyframes blink{0%,60%,100%{opacity:.3}30%{opacity:1}}
+</style>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-GEF5QPMJR6"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-GEF5QPMJR6');
+</script>
+</head>
+<body>
+
+<header><div class="header-inner">
+<a href="/" class="logo"><span class="logo-dot"></span>AI花哥</a>
+<div class="header-actions">
+<button onclick="clearChat()">清空</button>
+<a href="/">← 返回</a>
+</div>
+</div></header>
+
+<div class="chat-container" id="chat"></div>
+
+<div class="input-area">
+<div class="api-config">
+<input id="apiKey" placeholder="DeepSeek API Key（本地存储，不会上传服务器）" type="password">
+<input id="apiUrl" value="https://api.deepseek.com/v1" style="max-width:240px">
+<span class="saved" id="savedHint"></span>
+</div>
+<div class="input-inner">
+<textarea id="input" placeholder="输入消息… (Enter发送，Shift+Enter换行)" rows="1" onkeydown="handleKey(event)"></textarea>
+<button id="sendBtn" onclick="send()">发送</button>
+</div>
+</div>
+
+<script>
+const chat=document.getElementById('chat'),input=document.getElementById('input'),sendBtn=document.getElementById('sendBtn');
+const apiKeyEl=document.getElementById('apiKey'),apiUrlEl=document.getElementById('apiUrl');
+
+// Load saved API key
+const saved=localStorage.getItem('ds_api_key');
+if(saved){apiKeyEl.value=saved;document.getElementById('savedHint').textContent='已保存';}
+apiKeyEl.onchange=()=>{localStorage.setItem('ds_api_key',apiKeyEl.value);document.getElementById('savedHint').textContent='已保存'};
+
+let messages=[{role:'system',content:'你是AI花哥的助手，用中文简洁回复。'}];
+
+function addMsg(role,content){
+const div=document.createElement('div');div.className='msg '+role;
+div.innerHTML=`<div class="msg-avatar">${role==='user'?'👤':'🤖'}</div><div class="msg-bubble">${escapeHtml(content)}</div>`;
+chat.appendChild(div);chat.scrollTop=chat.scrollHeight;
+}
+
+function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML.replace(/\n/g,'<br>');}
+
+async function send(){
+const text=input.value.trim();if(!text)return;
+const apiKey=apiKeyEl.value.trim();if(!apiKey){alert('请先输入 DeepSeek API Key');return}
+addMsg('user',text);input.value='';sendBtn.disabled=true;
+messages.push({role:'user',content:text});
+
+// Typing indicator
+const typing=document.createElement('div');typing.className='typing';typing.innerHTML='<span></span><span></span><span></span>';chat.appendChild(typing);chat.scrollTop=chat.scrollHeight;
+
+try{
+const res=await fetch(apiUrlEl.value+'/chat/completions',{
+method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+body:JSON.stringify({model:'deepseek-chat',messages,stream:false})
+});
+const data=await res.json();
+typing.remove();
+if(data.choices){
+const reply=data.choices[0].message.content;
+addMsg('ai',reply);messages.push({role:'assistant',content:reply});
+}else{
+addMsg('ai','错误: '+(data.error?.message||JSON.stringify(data)));
+}
+}catch(e){typing.remove();addMsg('ai','网络错误: '+e.message)}
+sendBtn.disabled=false;
+}
+
+function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}}
+function clearChat(){if(confirm('清空对话？')){messages=[{role:'system',content:'你是AI花哥的助手，用中文简洁回复。'}];chat.innerHTML=''}}
+</script>
+</body>
+</html>

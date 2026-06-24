@@ -1,0 +1,64 @@
+# 大文件/媒体文件
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.webm
+*.mp3
+*.wav
+*.flac
+*.zip
+*.tar.gz
+*.rar
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.gatsby/
+
+# 用户数据/敏感文件
+studio/data/users.json
+**/users.json
+**/*.bak
+*.log
+**/.last_md5
+
+# 系统文件
+.DS_Store
+Thumbs.db
+.htaccess
+
+# 残留验证文件
+baidu_verify*
+*IndexNow*.txt
+*_verify*.html
+
+# 部署脚本
+deploy-to-server.sh
+compress_videos.py
+
+# 临时文件
+*.swp
+*.swo
+*~
+
+# 大型媒体目录
+poetry/
+more/
+music/
+tv/hls/
+
+# Python venv
+research/venv/
+
+# 已删除的敏感脚本
+studio/init_admin.php
+studio/init_admin.php.REMOVED

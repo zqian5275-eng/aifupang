@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>文章 · AI花哥</title>
+<style>
+:root{--bg:#050507;--card:#101010;--border:#3d3a39;--green:#00d992;--purple:#a78bfa;--text:#f2f2f2;--text2:#b8b3b0;--text3:#8b949e}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:system-ui,'PingFang SC','Microsoft YaHei',sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(30,41,59,.3)1px,transparent 1px),linear-gradient(90deg,rgba(30,41,59,.3)1px,transparent 1px);background-size:60px 60px}
+header{position:sticky;top:0;z-index:100;background:rgba(5,5,7,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 24px}
+.header-inner{max-width:1000px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:56px}
+.logo{font-size:20px;font-weight:700;color:var(--green);text-decoration:none;display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;box-shadow:0 0 8px rgba(0,217,146,.3)}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}
+.back-link{color:var(--text2);text-decoration:none;font-size:14px}.back-link:hover{color:var(--green)}
+
+.container{position:relative;z-index:1;max-width:800px;margin:0 auto;padding:40px 20px}
+h1{font-size:32px;font-weight:400;margin-bottom:8px;letter-spacing:-.5px}
+h1 .hl{color:var(--purple)}
+.sub{font-size:14px;color:var(--text3);margin-bottom:40px}
+
+.article{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:24px;margin-bottom:16px;text-decoration:none;color:var(--text);display:block;transition:all .3s}
+.article:hover{border-color:rgba(255,255,255,.1);box-shadow:0 0 20px rgba(0,0,0,.4);transform:translateY(-1px)}
+.article .date{font-size:12px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:8px}
+.article h3{font-size:18px;font-weight:600;margin-bottom:6px}
+.article p{font-size:13px;color:var(--text2);line-height:1.6}
+.article .tag{display:inline-block;margin-top:8px;padding:2px 8px;border-radius:10px;font-size:10px;font-family:'JetBrains Mono',monospace;background:rgba(167,139,250,.12);color:var(--purple)}
+
+.article-page{max-width:800px;line-height:1.8;font-size:15px}
+.article-page h2{font-size:22px;margin:32px 0 12px;color:var(--text)}
+.article-page p{margin-bottom:16px;color:var(--text2)}
+.article-page .meta{font-size:12px;color:var(--text3);margin-bottom:32px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+
+footer{position:relative;z-index:1;text-align:center;padding:40px 20px;border-top:1px solid var(--border);color:var(--text3);font-size:12px;margin-top:60px}
+</style>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-GEF5QPMJR6"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-GEF5QPMJR6');
+</script>
+</head>
+<body>
+<header><div class="header-inner">
+<a href="/" class="logo"><span class="logo-dot"></span>AI花哥</a>
+<a href="/" class="back-link">← 返回中枢</a>
+</div></header>
+
+<div class="container">
+<h1>📝 文章<span class="hl">·</span>博客</h1>
+<p class="sub">10年私募副总视角 · AI×金融 · 行业观察</p>
+
+<a href="/blog/ai-stock-review.html" class="article">
+<div class="date">2026.06.01</div>
+<h3>AI一天刷完300家公司财报，人类分析师还有活路吗</h3>
+<p>我亲眼看着AI花了不到3分钟，读完了300家公司的财报。说实话，那一刻我后背发凉……</p>
+<span class="tag">AI×金融</span>
+</a>
+
+<a href="/blog/ai-video-revolution.html" class="article">
+<div class="date">2026.05.25</div>
+<h3>AI视频生成的奇点时刻：从文字到视频只需3分钟</h3>
+<p>年初还在讨论AI绘画会不会取代设计师，半年后AI已经开始批量生产短视频了。这个速度，比我预想的快了至少一年。</p>
+<span class="tag">AI趋势</span>
+</a>
+
+<div style="background:var(--card);border:1px dashed var(--border);border-radius:8px;padding:32px;text-align:center;color:var(--text3);margin-top:16px">
+🚧 更多文章撰写中……<br>公众号/抖音同步更新
+</div>
+</div>
+<footer>© 2026 AI花哥 · 用AI重构信息获取方式</footer>
+</body>
+</html>

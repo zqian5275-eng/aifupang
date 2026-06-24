@@ -1,0 +1,145 @@
+{
+  "_说明": "诗词ID与视频文件对应表，根据你的视频文件名修改",
+  "_格式": "诗词ID: { videoType: 'direct', videoUrl: '/古诗/视频文件名.mp4' }",
+  
+  "一年级上册": {
+    "1-1-1": { "videoType": "direct", "videoUrl": "/古诗/咏鹅.mp4" },
+    "1-1-2": { "videoType": "direct", "videoUrl": "/古诗/江南.mp4" },
+    "1-1-3": { "videoType": "direct", "videoUrl": "/古诗/画.mp4" },
+    "1-1-4": { "videoType": "direct", "videoUrl": "/古诗/悯农.mp4" },
+    "1-1-5": { "videoType": "direct", "videoUrl": "/古诗/古朗月行.mp4" },
+    "1-1-6": { "videoType": "direct", "videoUrl": "/古诗/风.mp4" }
+  },
+  
+  "一年级下册": {
+    "1-2-1": { "videoType": "direct", "videoUrl": "/古诗/春晓.mp4" },
+    "1-2-2": { "videoType": "direct", "videoUrl": "/古诗/赠汪伦.mp4" },
+    "1-2-3": { "videoType": "direct", "videoUrl": "/古诗/静夜思.mp4" },
+    "1-2-4": { "videoType": "direct", "videoUrl": "/古诗/寻隐者不遇.mp4" },
+    "1-2-5": { "videoType": "direct", "videoUrl": "/古诗/池上.mp4" },
+    "1-2-6": { "videoType": "direct", "videoUrl": "/古诗/小池.mp4" },
+    "1-2-7": { "videoType": "direct", "videoUrl": "/古诗/画鸡.mp4" }
+  },
+  
+  "二年级上册": {
+    "2-1-1": { "videoType": "direct", "videoUrl": "/古诗/梅花.mp4" },
+    "2-1-2": { "videoType": "direct", "videoUrl": "/古诗/小儿垂钓.mp4" },
+    "2-1-3": { "videoType": "direct", "videoUrl": "/古诗/登鹳雀楼.mp4" },
+    "2-1-4": { "videoType": "direct", "videoUrl": "/古诗/望庐山瀑布.mp4" },
+    "2-1-5": { "videoType": "direct", "videoUrl": "/古诗/江雪.mp4" },
+    "2-1-6": { "videoType": "direct", "videoUrl": "/古诗/夜宿山寺.mp4" },
+    "2-1-7": { "videoType": "direct", "videoUrl": "/古诗/敕勒歌.mp4" }
+  },
+  
+  "二年级下册": {
+    "2-2-1": { "videoType": "direct", "videoUrl": "/古诗/村居.mp4" },
+    "2-2-2": { "videoType": "direct", "videoUrl": "/古诗/咏柳.mp4" },
+    "2-2-3": { "videoType": "direct", "videoUrl": "/古诗/赋得古原草送别.mp4" },
+    "2-2-4": { "videoType": "direct", "videoUrl": "/古诗/晓出净慈寺送林子方.mp4" },
+    "2-2-5": { "videoType": "direct", "videoUrl": "/古诗/绝句.mp4" },
+    "2-2-6": { "videoType": "direct", "videoUrl": "/古诗/悯农其一.mp4" },
+    "2-2-7": { "videoType": "direct", "videoUrl": "/古诗/舟夜书所见.mp4" }
+  },
+  
+  "三年级上册": {
+    "3-1-1": { "videoType": "direct", "videoUrl": "/古诗/所见.mp4" },
+    "3-1-2": { "videoType": "direct", "videoUrl": "/古诗/山行.mp4" },
+    "3-1-3": { "videoType": "direct", "videoUrl": "/古诗/赠刘景文.mp4" },
+    "3-1-4": { "videoType": "direct", "videoUrl": "/古诗/夜书所见.mp4" },
+    "3-1-5": { "videoType": "direct", "videoUrl": "/古诗/望天门山.mp4" },
+    "3-1-6": { "videoType": "direct", "videoUrl": "/古诗/饮湖上初晴后雨.mp4" },
+    "3-1-7": { "videoType": "direct", "videoUrl": "/古诗/望洞庭.mp4" },
+    "3-1-8": { "videoType": "direct", "videoUrl": "/古诗/早发白帝城.mp4" },
+    "3-1-9": { "videoType": "direct", "videoUrl": "/古诗/采莲曲.mp4" }
+  },
+  
+  "三年级下册": {
+    "3-2-1": { "videoType": "direct", "videoUrl": "/古诗/绝句.mp4" },
+    "3-2-2": { "videoType": "direct", "videoUrl": "/古诗/惠崇春江晚景.mp4" },
+    "3-2-3": { "videoType": "direct", "videoUrl": "/古诗/三衢道中.mp4" },
+    "3-2-4": { "videoType": "direct", "videoUrl": "/古诗/忆江南.mp4" },
+    "3-2-5": { "videoType": "direct", "videoUrl": "/古诗/元日.mp4" },
+    "3-2-6": { "videoType": "direct", "videoUrl": "/古诗/清明.mp4" },
+    "3-2-7": { "videoType": "direct", "videoUrl": "/古诗/九月九日忆山东兄弟.mp4" },
+    "3-2-8": { "videoType": "direct", "videoUrl": "/古诗/滁州西涧.mp4" },
+    "3-2-9": { "videoType": "direct", "videoUrl": "/古诗/大林寺桃花.mp4" }
+  },
+  
+  "四年级上册": {
+    "4-1-1": { "videoType": "direct", "videoUrl": "/古诗/鹿柴.mp4" },
+    "4-1-2": { "videoType": "direct", "videoUrl": "/古诗/暮江吟.mp4" },
+    "4-1-3": { "videoType": "direct", "videoUrl": "/古诗/题西林壁.mp4" },
+    "4-1-4": { "videoType": "direct", "videoUrl": "/古诗/雪梅.mp4" },
+    "4-1-5": { "videoType": "direct", "videoUrl": "/古诗/嫦娥.mp4" },
+    "4-1-6": { "videoType": "direct", "videoUrl": "/古诗/出塞.mp4" },
+    "4-1-7": { "videoType": "direct", "videoUrl": "/古诗/凉州词.mp4" },
+    "4-1-8": { "videoType": "direct", "videoUrl": "/古诗/夏日绝句.mp4" },
+    "4-1-9": { "videoType": "direct", "videoUrl": "/古诗/别董大.mp4" }
+  },
+  
+  "四年级下册": {
+    "4-2-1": { "videoType": "direct", "videoUrl": "/古诗/宿新市徐公店.mp4" },
+    "4-2-2": { "videoType": "direct", "videoUrl": "/古诗/四时田园杂兴其二十五.mp4" },
+    "4-2-3": { "videoType": "direct", "videoUrl": "/古诗/清平乐村居.mp4" },
+    "4-2-4": { "videoType": "direct", "videoUrl": "/古诗/卜算子咏梅.mp4" },
+    "4-2-5": { "videoType": "direct", "videoUrl": "/古诗/江畔独步寻花.mp4" },
+    "4-2-6": { "videoType": "direct", "videoUrl": "/古诗/蜂.mp4" },
+    "4-2-7": { "videoType": "direct", "videoUrl": "/古诗/独坐敬亭山.mp4" },
+    "4-2-8": { "videoType": "direct", "videoUrl": "/古诗/芙蓉楼送辛渐.mp4" },
+    "4-2-9": { "videoType": "direct", "videoUrl": "/古诗/塞下曲.mp4" },
+    "4-2-10": { "videoType": "direct", "videoUrl": "/古诗/墨梅.mp4" }
+  },
+  
+  "五年级上册": {
+    "5-1-1": { "videoType": "direct", "videoUrl": "/古诗/蝉.mp4" },
+    "5-1-2": { "videoType": "direct", "videoUrl": "/古诗/乞巧.mp4" },
+    "5-1-3": { "videoType": "direct", "videoUrl": "/古诗/示儿.mp4" },
+    "5-1-4": { "videoType": "direct", "videoUrl": "/古诗/题临安邸.mp4" },
+    "5-1-5": { "videoType": "direct", "videoUrl": "/古诗/己亥杂诗.mp4" },
+    "5-1-6": { "videoType": "direct", "videoUrl": "/古诗/山居秋暝.mp4" },
+    "5-1-7": { "videoType": "direct", "videoUrl": "/古诗/枫桥夜泊.mp4" },
+    "5-1-8": { "videoType": "direct", "videoUrl": "/古诗/长相思.mp4" },
+    "5-1-9": { "videoType": "direct", "videoUrl": "/古诗/渔歌子.mp4" },
+    "5-1-10": { "videoType": "direct", "videoUrl": "/古诗/送元二使安西.mp4" },
+    "5-1-11": { "videoType": "direct", "videoUrl": "/古诗/黄鹤楼送孟浩然之广陵.mp4" }
+  },
+  
+  "五年级下册": {
+    "5-2-1": { "videoType": "direct", "videoUrl": "/古诗/四时田园杂兴其三十一.mp4" },
+    "5-2-2": { "videoType": "direct", "videoUrl": "/古诗/稚子弄冰.mp4" },
+    "5-2-3": { "videoType": "direct", "videoUrl": "/古诗/村晚.mp4" },
+    "5-2-4": { "videoType": "direct", "videoUrl": "/古诗/乡村四月.mp4" },
+    "5-2-5": { "videoType": "direct", "videoUrl": "/古诗/凉州词王之涣.mp4" },
+    "5-2-6": { "videoType": "direct", "videoUrl": "/古诗/闻官军收河南河北.mp4" },
+    "5-2-7": { "videoType": "direct", "videoUrl": "/古诗/秋夜将晓出篱门迎凉有感.mp4" },
+    "5-2-8": { "videoType": "direct", "videoUrl": "/古诗/从军行.mp4" }
+  },
+  
+  "六年级上册": {
+    "6-1-1": { "videoType": "direct", "videoUrl": "/古诗/宿建德江.mp4" },
+    "6-1-2": { "videoType": "direct", "videoUrl": "/古诗/六月二十七日望湖楼醉书.mp4" },
+    "6-1-3": { "videoType": "direct", "videoUrl": "/古诗/西江月夜行黄沙道中.mp4" },
+    "6-1-4": { "videoType": "direct", "videoUrl": "/古诗/过故人庄.mp4" },
+    "6-1-5": { "videoType": "direct", "videoUrl": "/古诗/回乡偶书.mp4" },
+    "6-1-6": { "videoType": "direct", "videoUrl": "/古诗/浪淘沙.mp4" },
+    "6-1-7": { "videoType": "direct", "videoUrl": "/古诗/江南春.mp4" },
+    "6-1-8": { "videoType": "direct", "videoUrl": "/古诗/书湖阴先生壁.mp4" }
+  },
+  
+  "六年级下册": {
+    "6-2-1": { "videoType": "direct", "videoUrl": "/古诗/采薇.mp4" },
+    "6-2-2": { "videoType": "direct", "videoUrl": "/古诗/春夜喜雨.mp4" },
+    "6-2-3": { "videoType": "direct", "videoUrl": "/古诗/早春呈水部张十八员外.mp4" },
+    "6-2-4": { "videoType": "direct", "videoUrl": "/古诗/江上渔者.mp4" },
+    "6-2-5": { "videoType": "direct", "videoUrl": "/古诗/泊船瓜洲.mp4" },
+    "6-2-6": { "videoType": "direct", "videoUrl": "/古诗/游园不值.mp4" },
+    "6-2-7": { "videoType": "direct", "videoUrl": "/古诗/卜算子送鲍浩然之浙东.mp4" },
+    "6-2-8": { "videoType": "direct", "videoUrl": "/古诗/石灰吟.mp4" },
+    "6-2-9": { "videoType": "direct", "videoUrl": "/古诗/竹石.mp4" },
+    "6-2-10": { "videoType": "direct", "videoUrl": "/古诗/长歌行.mp4" },
+    "6-2-11": { "videoType": "direct", "videoUrl": "/古诗/迢迢牵牛星.mp4" },
+    "6-2-12": { "videoType": "direct", "videoUrl": "/古诗/十五夜望月.mp4" },
+    "6-2-13": { "videoType": "direct", "videoUrl": "/古诗/寒食.mp4" },
+    "6-2-14": { "videoType": "direct", "videoUrl": "/古诗/清平乐春归何处.mp4" }
+  }
+}

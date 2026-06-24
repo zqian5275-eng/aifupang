@@ -1,0 +1,337 @@
+<?php
+/**
+ * 批量流水线 - AI全自动视频生产
+ * 脚本 → 拆段编辑 → 配图 → 配音 → 合成
+ */
+?>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>批量流水线 · AI花哥</title>
+<style>
+:root{--bg:#050507;--card:#0d0d12;--border:#2a2830;--green:#00d992;--gold:#fbbf24;--text:#e8e8ed;--text2:#a09eaa;--text3:#6b6876;--accent:#fbbf24;--rose:#fb7185}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:system-ui,'PingFang SC','Microsoft YaHei',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+header{background:rgba(5,5,7,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:0;z-index:100}
+.header-inner{max-width:1000px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:56px}
+.logo{font-size:18px;font-weight:700;color:var(--green);text-decoration:none;display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}
+.back-link{color:var(--text3);text-decoration:none;font-size:13px}.back-link:hover{color:var(--gold)}
+.container{max-width:1000px;margin:0 auto;padding:24px 20px;flex:1}
+h1{font-size:22px;font-weight:600;margin-bottom:4px}
+.subtitle{font-size:12px;color:var(--text3);margin-bottom:20px}
+
+/* Step 1: Script input */
+.panel{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
+.panel h3{font-size:14px;font-weight:500;margin-bottom:12px;color:var(--text2)}
+textarea{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text);font-family:inherit;width:100%;resize:vertical;min-height:160px;transition:border .2s}
+textarea:focus{outline:none;border-color:var(--gold)}
+.hint{font-size:11px;color:var(--text3);margin-top:6px}
+.btn-row{display:flex;gap:8px;margin-top:12px}
+.btn{padding:8px 20px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text2);transition:all .2s}
+.btn:hover{background:rgba(255,255,255,.1);color:var(--text)}
+.btn.primary{background:var(--gold);border-color:var(--gold);color:#1a1a2e;font-weight:600}
+.btn.primary:hover{box-shadow:0 0 20px rgba(251,191,36,.3)}
+.btn.danger{background:transparent;border-color:rgba(251,113,133,.3);color:var(--rose)}
+.btn.danger:hover{background:rgba(251,113,133,.1)}
+select{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;cursor:pointer}
+
+/* Step 2: Segments */
+.segment-card{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px}
+.segment-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.segment-num{font-size:11px;font-weight:600;color:var(--gold);background:rgba(251,191,36,.1);padding:2px 10px;border-radius:10px}
+.segment-fields{display:flex;gap:10px}
+.segment-fields .field{flex:1}
+.segment-fields label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px}
+.segment-fields input{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--text);width:100%;font-family:inherit}
+.segment-fields input:focus{outline:none;border-color:var(--gold)}
+.segment-fields .label-visual{color:#a78bfa}
+.segment-fields .label-narr{color:#22d3ee}
+
+.empty-state{text-align:center;padding:40px;color:var(--text3);font-size:13px}
+
+/* Progress */
+.progress-panel{display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-top:16px}
+.progress-panel.show{display:block}
+.progress-bar{height:4px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden;margin:12px 0}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--green));border-radius:2px;transition:width .5s;width:0%}
+.progress-text{font-size:13px;color:var(--text2)}
+.progress-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;animation:pulse 1.5s infinite;background:var(--gold)}
+.progress-dot.done{background:var(--green);animation:none}
+.progress-dot.err{background:var(--rose);animation:none}
+
+.result-panel{display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-top:16px}
+.result-panel.show{display:block}
+.result-panel video{width:100%;max-height:480px;border-radius:8px;background:#000}
+.result-panel .dl{display:inline-block;margin-top:10px;padding:8px 16px;border-radius:8px;background:rgba(0,217,146,.1);border:1px solid rgba(0,217,146,.2);color:var(--green);text-decoration:none;font-size:13px}
+.error{display:none;padding:12px;border-radius:8px;background:rgba(251,113,133,.08);border:1px solid rgba(251,113,133,.2);color:var(--rose);font-size:13px;margin-top:12px}
+.error.show{display:block}
+
+footer{text-align:center;padding:20px;color:var(--text3);font-size:12px;border-top:1px solid var(--border);margin-top:auto}
+@media(max-width:700px){.segment-fields{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<header>
+<div class="header-inner">
+<a href="/" class="logo"><span class="logo-dot"></span>AI花哥</a>
+<a href="/studio/" class="back-link">← 返回工坊</a>
+</div>
+</header>
+
+<div class="container">
+<h1>📦 批量流水线</h1>
+<p class="subtitle">粘贴脚本 → 编辑段落 → 一键生成视频。每段自动配图+配音+字幕</p>
+
+<!-- Step 1: Input -->
+<div class="panel" id="input-panel">
+<h3>📝 粘贴脚本</h3>
+<textarea id="script-input" placeholder="支持两种格式：&#10;&#10;1. 纯文本（空行分段）：&#10;清晨的阳光洒在古老的城墙上&#10;&#10;远处的钟楼传来悠扬的钟声&#10;&#10;2. 结构化脚本（画面+文字）：&#10;画面：一只小刺猬站在草地上&#10;文字：森林里住着一只叫阿刺的小刺猬&#10;&#10;画面：小兔子们在追逐玩耍&#10;文字：小刺猬想加入游戏"></textarea>
+<div class="hint">每段会自动拆分为「画面描述」和「配音文本」，可在下方编辑</div>
+<div class="btn-row">
+<select id="style-select">
+<option value="cinematic">电影感</option>
+<option value="anime">动漫风格</option>
+<option value="watercolor">水彩治愈</option>
+<option value="realistic">写实风格</option>
+<option value="traditional chinese painting">中国风水墨</option>
+<option value="oil painting">油画风格</option>
+</select>
+<button class="btn primary" onclick="parseAndShow()">🔍 解析脚本</button>
+</div>
+</div>
+
+<!-- Step 2: Segments Editor -->
+<div class="panel" id="editor-panel" style="display:none">
+<h3>✏️ 编辑段落 (<span id="seg-count">0</span>段)</h3>
+<div id="segments-container"></div>
+<div class="btn-row">
+<button class="btn" onclick="addSegment()">＋ 添加段落</button>
+<button class="btn primary" onclick="startPipeline()" id="submit-btn">🚀 开始生产</button>
+<button class="btn" onclick="resetAll()">↩ 返回编辑脚本</button>
+</div>
+</div>
+
+<!-- Progress -->
+<div class="progress-panel" id="progress-panel">
+<div class="progress-text"><span class="progress-dot" id="progress-dot"></span><span id="status-msg">准备中...</span></div>
+<div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+<div class="error" id="error-msg"></div>
+</div>
+
+<!-- Result -->
+<div class="result-panel" id="result-panel">
+<video id="result-video" controls></video>
+<a class="dl" id="dl-btn" href="#" download>💾 下载视频</a>
+</div>
+</div>
+
+<footer>© 2026 AI创作工坊 · 全自动视频生产流水线</footer>
+
+<script>
+const API = '/studio/pipeline/api/';
+let segments = [];
+let pollingTimer = null;
+
+// ---- Parse script into segments ----
+function parseAndShow() {
+    const text = document.getElementById('script-input').value.trim();
+    if (!text) { alert('请先粘贴脚本'); return; }
+
+    // Detect format: has 画面/文字 markers?
+    const hasVisual = /画面[：:]/.test(text);
+    const hasNarr = /文字[：:]/.test(text);
+
+    if (hasVisual && hasNarr) {
+        // Structured format
+        segments = parseStructured(text);
+    } else {
+        // Plain text: split by double newline
+        const parts = text.split(/\n\s*\n/).filter(p => p.trim());
+        if (parts.length <= 1) {
+            // Single newline split
+            const lines = text.split('\n').filter(l => l.trim());
+            segments = lines.slice(0, 10).map(line => ({
+                image_prompt: line,
+                narration: cleanText(line)
+            }));
+        } else {
+            segments = parts.slice(0, 10).map(part => ({
+                image_prompt: part,
+                narration: cleanText(part)
+            }));
+        }
+    }
+
+    renderSegments();
+    document.getElementById('input-panel').style.display = 'none';
+    document.getElementById('editor-panel').style.display = 'block';
+}
+
+function parseStructured(text) {
+    const result = [];
+    // Split by 封面/封底/第X页
+    const pages = text.split(/\n(?=封面|封底|第\s*[0-9零一二三四五六七八九十]+\s*[页幕])/);
+    
+    for (const page of pages) {
+        const trimmed = page.trim();
+        if (!trimmed) continue;
+        
+        let image_prompt = '';
+        let narration = '';
+        
+        const imgMatch = trimmed.match(/画面[：:]\s*(.+?)(?=\n(?:文字|标题|作者|$)|\n\n|$)/s);
+        if (imgMatch) image_prompt = imgMatch[1].trim();
+        
+        const txtMatch = trimmed.match(/文字[：:]\s*(.+?)(?=\n(?:画面|互动|绘本|$)|\n\n|$)/s);
+        if (txtMatch) narration = txtMatch[1].trim();
+        
+        // Clean narration
+        narration = cleanText(narration);
+        
+        if (!image_prompt) image_prompt = narration || trimmed.substring(0, 200);
+        if (!narration) narration = image_prompt;
+        
+        if (image_prompt && narration) {
+            result.push({image_prompt, narration});
+        }
+    }
+    return result.slice(0, 12);
+}
+
+function cleanText(text) {
+    // Remove structural prefixes
+    return text
+        .replace(/^第[一二三四五六七八九十0-9]+[张段部分幕节集幅图]\s*[：:，,。.\s]*/g, '')
+        .replace(/^[0-9]+[\.\、\)）]\s*/g, '')
+        .replace(/^\([0-9一二三四五]+\)\s*/g, '')
+        .replace(/^[图片画面视频]+\s*[：:]\s*/g, '')
+        .replace(/^封面\s*/g, '')
+        .replace(/^封底\s*/g, '')
+        .trim();
+}
+
+// ---- Segment Editor ----
+function renderSegments() {
+    const container = document.getElementById('segments-container');
+    document.getElementById('seg-count').textContent = segments.length;
+    
+    container.innerHTML = segments.map((seg, i) => `
+        <div class="segment-card">
+            <div class="segment-header">
+                <span class="segment-num">第 ${i + 1} 段</span>
+                <button class="btn danger" onclick="removeSegment(${i})" style="padding:4px 12px;font-size:11px">删除</button>
+            </div>
+            <div class="segment-fields">
+                <div class="field">
+                    <label class="label-visual">🖼️ 画面描述（用于生成图片）</label>
+                    <input type="text" value="${escHtml(seg.image_prompt)}" onchange="updateSeg(${i},'image_prompt',this.value)" placeholder="描述画面内容...">
+                </div>
+                <div class="field">
+                    <label class="label-narr">🔊 配音文本（用于TTS+字幕）</label>
+                    <input type="text" value="${escHtml(seg.narration)}" onchange="updateSeg(${i},'narration',this.value)" placeholder="配音的文字...">
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function updateSeg(i, key, val) { segments[i][key] = val; }
+function removeSegment(i) { segments.splice(i, 1); renderSegments(); }
+function addSegment() { segments.push({image_prompt:'',narration:''}); renderSegments(); }
+
+function resetAll() {
+    segments = [];
+    document.getElementById('editor-panel').style.display = 'none';
+    document.getElementById('input-panel').style.display = 'block';
+    document.getElementById('progress-panel').classList.remove('show');
+    document.getElementById('result-panel').classList.remove('show');
+}
+
+// ---- Pipeline ----
+async function startPipeline() {
+    // Filter empty segments
+    const valid = segments.filter(s => (s.image_prompt||'').trim() || (s.narration||'').trim());
+    if (valid.length === 0) { alert('请至少填写一个段落'); return; }
+    segments = valid;
+
+    const style = document.getElementById('style-select').value;
+    const btn = document.getElementById('submit-btn');
+    
+    if (pollingTimer) { clearTimeout(pollingTimer); pollingTimer = null; }
+    
+    btn.disabled = true; btn.textContent = '⏳ 提交中...';
+    document.getElementById('progress-panel').classList.add('show');
+    document.getElementById('result-panel').classList.remove('show');
+    document.getElementById('error-msg').classList.remove('show');
+    document.getElementById('progress-fill').style.width = '0%';
+    document.getElementById('status-msg').textContent = '提交任务...';
+    document.getElementById('progress-dot').className = 'progress-dot';
+
+    try {
+        const resp = await fetch(API, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({segments, style})
+        });
+        const data = await resp.json();
+        if (!data.success) { showError(data.error); return; }
+        btn.textContent = '⏳ 生产中...';
+        pollProgress(data.job_id);
+    } catch(e) { showError('网络错误: ' + e.message); }
+}
+
+function pollProgress(jobId) {
+    fetch(API + 'progress/' + jobId).then(r => r.json()).then(data => {
+        const fill = document.getElementById('progress-fill');
+        const msg = document.getElementById('status-msg');
+        const dot = document.getElementById('progress-dot');
+        
+        if (data.status === 'completed') {
+            fill.style.width = '100%';
+            msg.textContent = '✅ 视频生产完成！';
+            dot.className = 'progress-dot done';
+            showResult(data.url);
+            document.getElementById('submit-btn').disabled = false;
+            document.getElementById('submit-btn').textContent = '🚀 再次生产';
+        } else if (data.status === 'failed') {
+            dot.className = 'progress-dot err';
+            msg.textContent = '❌ 生产失败';
+            showError(data.error);
+            document.getElementById('submit-btn').disabled = false;
+            document.getElementById('submit-btn').textContent = '🚀 重新生产';
+        } else {
+            const total = data.total || 1;
+            const current = data.current || 0;
+            const step = data.step || '';
+            const pct = Math.round((current / total) * 100);
+            fill.style.width = pct + '%';
+            const stepNames = {image:'生成配图',subtitle:'添加字幕',audio:'生成配音',video:'合成片段',concat:'合并视频'};
+            msg.textContent = `🎬 第 ${current}/${total} 段 · ${stepNames[step] || step}`;
+            pollingTimer = setTimeout(() => pollProgress(jobId), 3000);
+        }
+    }).catch(() => { pollingTimer = setTimeout(() => pollProgress(jobId), 5000); });
+}
+
+function showResult(url) {
+    document.getElementById('result-panel').classList.add('show');
+    document.getElementById('result-video').src = url;
+    document.getElementById('dl-btn').href = url;
+}
+
+function showError(msg) {
+    const el = document.getElementById('error-msg');
+    el.textContent = msg;
+    el.classList.add('show');
+    document.getElementById('submit-btn').disabled = false;
+    document.getElementById('submit-btn').textContent = '🚀 重新生产';
+}
+</script>
+</body>
+</html>

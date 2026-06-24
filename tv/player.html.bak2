@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电视直播</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei",sans-serif;background:#0d0d0d;color:#eee;display:flex;height:100vh;overflow:hidden}
+#sidebar{width:300px;background:#1a1a1a;display:flex;flex-direction:column;border-right:1px solid #333}
+#sidebar-header{padding:14px 16px;background:#222;text-align:center;font-size:16px;font-weight:bold}
+#search-box{padding:6px 12px;background:#222}
+#search-box input{width:100%;padding:8px 12px;border:none;border-radius:4px;background:#333;color:#eee;font-size:13px;outline:none}
+#group-tabs{display:flex;overflow-x:auto;background:#1a1a1a;border-bottom:1px solid #333;white-space:nowrap}
+.gt{padding:7px 14px;cursor:pointer;color:#888;font-size:12px;border-bottom:2px solid transparent;white-space:nowrap}
+.gt:hover{color:#ccc}
+.gt.active{color:#f5a623;border-bottom-color:#f5a623}
+#channel-list{flex:1;overflow-y:auto}
+.ci{padding:10px 14px;cursor:pointer;border-bottom:1px solid #2a2a2a;transition:background .15s;display:flex;align-items:center;gap:8px}
+.ci:hover{background:#2a2a2a}
+.ci.active{background:#333}
+.ci .em{font-size:18px;flex-shrink:0}
+.ci .nm{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#player-container{flex:1;display:flex;flex-direction:column;background:#000}
+#player-header{padding:10px 16px;background:#1a1a1a;display:flex;align-items:center;gap:12px}
+#player-header .cn{font-size:15px;font-weight:bold}
+#player-header .cs{font-size:11px;color:#888}
+#video-wrapper{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#000}
+#video-wrapper video{width:100%;height:100%;object-fit:contain;background:#000}
+#status-bar{padding:5px 14px;background:#1a1a1a;font-size:11px;color:#888;display:flex;justify-content:space-between}
+.load-overlay{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.8);z-index:10}
+.spinner{width:36px;height:36px;border:3px solid #333;border-top-color:#f5a623;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:#444;border-radius:3px}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+<div id="sidebar">
+<div id="sidebar-header">电视直播</div>
+<div id="search-box"><input type="text" id="search" placeholder="搜索频道..."></div>
+<div id="group-tabs"></div>
+<div id="channel-list"></div>
+</div>
+<div id="player-container">
+<div id="player-header">
+<span class="cn" id="current-name">选择一个频道</span>
+<span class="cs" id="current-source"></span>
+</div>
+<div id="video-wrapper">
+<video id="video" controls autoplay></video>
+<div class="load-overlay" id="loading" style="display:none"><div class="spinner"></div></div>
+</div>
+<div id="status-bar">
+<span id="total-channels">加载中...</span>
+<span id="player-status"></span>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+(function(){
+var channels=[],groups=["全部"],currentGroup="全部",currentChannel=null,hls=null;
+var API_BASE="/tv";
+
+function getGroupTabs(){
+var c=document.querySelectorAll(".gt");
+for(var i=0;i<c.length;i++){
+if(c[i].classList.contains("active"))return c[i].textContent;
+}
+return "全部";
+}
+
+function fetchChannels(){
+document.getElementById("total-channels").textContent="加载中...";
+fetch(API_BASE+"/api/channels")
+.then(function(r){return r.json()})
+.then(function(data){
+channels=data;
+var uG=[];
+data.forEach(function(c){if(uG.indexOf(c.group)===-1)uG.push(c.group)});
+groups=["全部"].concat(uG);
+renderGroupTabs();
+renderChannelList("");
+document.getElementById("total-channels").textContent="共 "+data.length+" 个频道";
+})
+.catch(function(err){
+document.getElementById("total-channels").textContent="加载失败: "+err.message;
+console.error(err);
+});
+}
+
+function renderGroupTabs(){
+var c=document.getElementById("group-tabs");
+c.innerHTML="";
+groups.forEach(function(g){
+var t=document.createElement("div");
+t.className="gt"+(g===currentGroup?" active":"");
+t.textContent=g;
+t.addEventListener("click",function(){
+currentGroup=g;renderGroupTabs();renderChannelList("");
+});
+c.appendChild(t);
+});
+}
+
+function renderChannelList(filter){
+if(filter===undefined)filter="";
+var c=document.getElementById("channel-list");
+c.innerHTML="";
+var f=channels;
+if(currentGroup!=="全部")f=channels.filter(function(ch){return ch.group===currentGroup});
+if(filter)f=f.filter(function(ch){return ch.name.indexOf(filter)!==-1});
+f.forEach(function(ch){
+var item=document.createElement("div");
+item.className="ci"+(ch===currentChannel?" active":"");
+var em=document.createElement("span");
+em.className="em";
+em.textContent=getEmoji(ch.name);
+item.appendChild(em);
+var nm=document.createElement("span");
+nm.className="nm";
+nm.textContent=ch.name;
+item.appendChild(nm);
+item.addEventListener("click",(function(c){return function(){playChannel(c)}})(ch));
+c.appendChild(item);
+});
+}
+
+function getEmoji(name){
+var m={"CCTV-1":"\u{1f4fa}","CCTV-2":"\u{1f4b0}","CCTV-3":"\u{1f3ad}","CCTV-4":"\u{1f30f}","CCTV-5":"\u26bd","CCTV-5+":"\u{1f3cb}","CCTV-6":"\u{1f3ac}","CCTV-7":"\u{1f397}\ufe0f","CCTV-9":"\u{1f3fd}","CCTV-10":"\u{1f52c}","CCTV-11":"\u{1f3aa}","CCTV-12":"\u2696\ufe0f","CCTV-13":"\u{1f4f0}","CCTV-14":"\u{1f9f8}","CCTV-15":"\u{1f3b5}","CCTV-16":"\u{1f3c5}","CCTV-17":"\u{1f33e}"};
+for(var k in m){if(name.indexOf(k)!==-1)return m[k]}
+if(name.indexOf("卫视")!==-1)return"\u{1f4e1}";
+if(name.indexOf("卫视")!==-1)return"\u{1f4e1}";
+return"\u{1f4fa}";
+}
+
+function playChannel(channel){
+currentChannel=channel;
+document.getElementById("current-name").textContent=channel.name;
+document.getElementById("player-status").textContent="准备播放...";
+document.getElementById("loading").style.display="flex";
+document.getElementById("video").style.display="none";
+
+fetch(API_BASE+"/api/play/"+channel.id)
+.then(function(r){return r.json()})
+.then(function(data){
+if(data.success){
+var src=API_BASE+data.hls_url;
+document.getElementById("current-source").textContent="来源: "+src;
+startPlayback(src);
+}else{
+document.getElementById("loading").style.display="none";
+document.getElementById("player-status").textContent="获取直播流失败";
+}
+})
+.catch(function(err){
+document.getElementById("loading").style.display="none";
+document.getElementById("player-status").textContent="请求失败: "+err.message;
+});
+}
+
+function startPlayback(url){
+var video=document.getElementById("video");
+if(hls){hls.destroy();hls=null}
+video.pause();video.removeAttribute("src");video.load();
+
+if(url.indexOf(".m3u8")!==-1&&Hls&&Hls.isSupported()){
+hls=new Hls({enableWorker:true,maxBufferLength:30,maxMaxBufferLength:60});
+hls.loadSource(url);
+hls.attachMedia(video);
+hls.on(Hls.Events.MANIFEST_PARSED,function(){
+document.getElementById("loading").style.display="none";
+video.style.display="block";
+document.getElementById("player-status").textContent="正在播放";
+video.play().catch(function(){});
+});
+hls.on(Hls.Events.ERROR,function(e,data){
+console.warn("HLS error:",data.type,data.details);
+if(data.fatal){
+document.getElementById("loading").style.display="none";
+if(data.type===Hls.ErrorTypes.NETWORK_ERROR){
+document.getElementById("player-status").textContent="网络错误，5秒后重试...";
+setTimeout(function(){hls.startLoad();document.getElementById("player-status").textContent="正在播放"},5000);
+}else if(data.type===Hls.ErrorTypes.MEDIA_ERROR){
+hls.recoverMediaError();
+}else{
+document.getElementById("player-status").textContent="播放失败";
+}
+}
+});
+}else if(video.canPlayType("application/vnd.apple.mpegurl")){
+video.src=url;
+video.addEventListener("loadedmetadata",function(){
+document.getElementById("loading").style.display="none";
+video.style.display="block";
+document.getElementById("player-status").textContent="正在播放";
+video.play().catch(function(){});
+},{once:true});
+video.addEventListener("error",function(){
+document.getElementById("loading").style.display="none";
+document.getElementById("player-status").textContent="播放失败";
+},{once:true});
+}else{
+video.src=url;
+video.addEventListener("loadeddata",function(){
+document.getElementById("loading").style.display="none";
+video.style.display="block";
+document.getElementById("player-status").textContent="正在播放";
+video.play().catch(function(){});
+},{once:true});
+video.addEventListener("error",function(){
+document.getElementById("loading").style.display="none";
+document.getElementById("player-status").textContent="播放失败";
+},{once:true});
+}
+}
+
+document.getElementById("search").addEventListener("input",function(e){renderChannelList(e.target.value)});
+
+document.addEventListener("keydown",function(e){
+if(document.activeElement.tagName==="INPUT")return;
+var idx=-1;
+var filtered=channels;
+if(currentGroup!=="全部")filtered=channels.filter(function(c){return c.group===currentGroup});
+idx=filtered.indexOf(currentChannel);
+if(e.key==="ArrowUp"&&idx>0)playChannel(filtered[idx-1]);
+if(e.key==="ArrowDown"&&idx<filtered.length-1)playChannel(filtered[idx+1]);
+});
+
+fetchChannels();
+})();
+</script>
+</body>
+</html>

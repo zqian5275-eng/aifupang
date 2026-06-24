@@ -1,0 +1,773 @@
+<?php
+/**
+ * AI 视频生成 - 前端页面
+ * 支持文生视频 / 图生视频 / 关键帧动画
+ */
+?>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 视频生成 · AI花哥</title>
+<style>
+:root {
+    --bg: #050507;
+    --card: #0d0d12;
+    --border: #2a2830;
+    --border-focus: #8b5cf6;
+    --green: #00d992;
+    --purple: #a78bfa;
+    --text: #e8e8ed;
+    --text2: #a09eaa;
+    --text3: #6b6876;
+    --danger: #fb7185;
+    --accent: #8b5cf6;
+    --accent-glow: rgba(139, 92, 246, 0.25);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+header {
+    background: rgba(5,5,7,.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.header-inner {
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+}
+.logo {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--green);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.logo-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .5; transform: scale(1.5); }
+}
+.back-link { color: var(--text3); text-decoration: none; font-size: 13px; }
+.back-link:hover { color: var(--purple); }
+
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px 20px;
+    flex: 1;
+}
+h1 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+}
+.subtitle {
+    font-size: 13px;
+    color: var(--text3);
+    margin-bottom: 32px;
+}
+
+/* 模式选择 */
+.mode-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 24px;
+}
+.mode-tab {
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+}
+.mode-tab:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.mode-tab.active {
+    color: #fff;
+    background: rgba(139, 92, 246, .15);
+    box-shadow: 0 0 12px var(--accent-glow);
+}
+
+/* 表单区 */
+.form-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+}
+.form-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+.form-row:last-child { margin-bottom: 0; }
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.form-group.grow { flex: 1; }
+.form-group label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+textarea, input[type="text"], input[type="number"], select {
+    background: rgba(255,255,255,.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    color: var(--text);
+    font-family: inherit;
+    transition: border .2s;
+    width: 100%;
+}
+textarea:focus, input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, .1);
+}
+textarea { resize: vertical; min-height: 80px; }
+select { cursor: pointer; }
+input[type="number"] { width: 90px; }
+
+/* 图片上传 */
+.upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(139, 92, 246, .04);
+}
+.upload-icon { font-size: 36px; opacity: .6; }
+.upload-text { font-size: 13px; color: var(--text2); }
+.upload-hint { font-size: 11px; color: var(--text3); }
+.image-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+.image-preview img {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+.image-preview .preview-item {
+    position: relative;
+}
+.image-preview .remove-btn {
+    position: absolute;
+    top: -6px; right: -6px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--danger);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity .2s;
+}
+.preview-item:hover .remove-btn { opacity: 1; }
+
+/* 高级设置 */
+.adv-toggle {
+    font-size: 12px;
+    color: var(--text3);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 16px;
+    user-select: none;
+}
+.adv-toggle:hover { color: var(--text2); }
+.adv-toggle .arrow {
+    transition: transform .2s;
+    display: inline-block;
+}
+.adv-toggle.open .arrow { transform: rotate(90deg); }
+.adv-settings {
+    display: none;
+    background: rgba(255,255,255,.02);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+.adv-settings.show { display: block; }
+
+/* 时长预设 */
+.duration-presets {
+    display: flex;
+    gap: 4px;
+    background: rgba(255,255,255,.02);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    width: fit-content;
+}
+.dur-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text2);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all .2s;
+}
+.dur-btn:hover { color: var(--text); }
+.dur-btn.active {
+    color: #fff;
+    background: rgba(139, 92, 246, .15);
+}
+
+/* 生成按钮 */
+.submit-btn {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), #7c3aed);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .3s;
+    margin-top: 8px;
+}
+.submit-btn:hover:not(:disabled) {
+    box-shadow: 0 0 30px var(--accent-glow);
+    transform: translateY(-1px);
+}
+.submit-btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+/* 结果区 */
+.result-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    display: none;
+}
+.result-section.show { display: block; }
+.progress-bar {
+    height: 4px;
+    background: rgba(255,255,255,.05);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 16px 0;
+}
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    border-radius: 2px;
+    transition: width .5s ease;
+    width: 0%;
+}
+.status-text {
+    font-size: 14px;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+}
+.status-dot.queued { background: #fbbf24; }
+.status-dot.processing { background: var(--accent); }
+.status-dot.completed { background: var(--green); animation: none; }
+.status-dot.failed { background: var(--danger); animation: none; }
+.video-result {
+    margin-top: 16px;
+    display: none;
+}
+.video-result.show { display: block; }
+.video-result video {
+    width: 100%;
+    max-height: 480px;
+    border-radius: 8px;
+    background: #000;
+}
+.error-msg {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(251, 113, 133, .08);
+    border: 1px solid rgba(251, 113, 133, .2);
+    color: var(--danger);
+    font-size: 13px;
+    display: none;
+}
+.error-msg.show { display: block; }
+
+/* 临时 URL 上传 */
+.url-input-group {
+    display: flex;
+    gap: 8px;
+}
+.url-input-group input {
+    flex: 1;
+}
+.url-add-btn {
+    padding: 10px 16px;
+    background: rgba(139, 92, 246, .1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+}
+.url-add-btn:hover { background: rgba(139, 92, 246, .2); }
+
+footer {
+    text-align: center;
+    padding: 24px;
+    color: var(--text3);
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+}
+.hidden { display: none !important; }
+
+@media (max-width: 600px) {
+    .form-row { flex-direction: column; }
+    .mode-tab { font-size: 12px; padding: 8px 10px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+<div class="header-inner">
+    <a href="/" class="logo"><span class="logo-dot"></span>AI花哥</a>
+    <a href="/studio/" class="back-link">← 返回工坊</a>
+</div>
+</header>
+
+<div class="container">
+    <h1>🎥 AI 视频生成</h1>
+    <p class="subtitle">AI 视频生成 · 文生视频 / 图生视频 / 关键帧动画</p>
+
+    <!-- 模式选择 -->
+    <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="text">📝 文生视频</button>
+        <button class="mode-tab" data-mode="image">🖼️ 图生视频</button>
+        <button class="mode-tab" data-mode="keyframes">🎬 关键帧动画</button>
+    </div>
+
+    <!-- 表单 -->
+    <div class="form-section">
+        <div class="form-group" style="margin-bottom:16px">
+            <label>提示词（Prompt）</label>
+            <textarea id="prompt" rows="4" placeholder="描述你想生成的视频内容、动作、场景、镜头运动和风格..."></textarea>
+        </div>
+
+        <!-- 图片区 -->
+        <div id="image-area" class="hidden">
+            <div class="form-row">
+                <div class="form-group grow">
+                    <label>图片上传</label>
+                    <div class="upload-zone" id="upload-zone">
+                        <span class="upload-icon">📤</span>
+                        <span class="upload-text">点击或拖拽上传图片</span>
+                        <span class="upload-hint">支持 JPG / PNG / WebP，最大 10MB</span>
+                    </div>
+                    <input type="file" id="file-input" accept="image/*" multiple class="hidden">
+                    <div class="image-preview" id="image-preview"></div>
+                </div>
+            </div>
+            <div class="form-row" style="margin-top:12px">
+                <div class="form-group grow">
+                    <label>或粘贴图片 URL</label>
+                    <div class="url-input-group">
+                        <input type="text" id="url-input" placeholder="https://example.com/image.png">
+                        <button class="url-add-btn" onclick="addImageUrl()">添加</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 时长预设 -->
+        <div class="form-group" style="margin-bottom:12px">
+            <label>视频时长</label>
+            <div class="duration-presets" id="dur-presets">
+                <button class="dur-btn" data-frames="81" data-fps="24">~3秒</button>
+                <button class="dur-btn active" data-frames="121" data-fps="24">~5秒</button>
+                <button class="dur-btn" data-frames="241" data-fps="24">~10秒</button>
+                <button class="dur-btn" data-frames="441" data-fps="24">~18秒</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 高级设置 -->
+    <div class="adv-toggle" onclick="toggleAdvanced()">
+        <span class="arrow">▶</span> 高级设置
+    </div>
+    <div class="adv-settings" id="adv-settings">
+        <div class="form-row">
+            <div class="form-group">
+                <label>帧数 (num_frames)</label>
+                <input type="number" id="num-frames" value="121" min="1" max="441" step="8">
+                <span style="font-size:10px;color:var(--text3);margin-top:2px">必须满足 8n+1</span>
+            </div>
+            <div class="form-group">
+                <label>帧率 (frame_rate)</label>
+                <input type="number" id="frame-rate" value="24" min="1" max="60">
+            </div>
+            <div class="form-group">
+                <label>随机种子</label>
+                <input type="number" id="seed" placeholder="留空则随机">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>负面提示词</label>
+                <input type="text" id="neg-prompt" placeholder="不想出现的内容...">
+            </div>
+        </div>
+    </div>
+
+    <!-- 提交 -->
+    <button class="submit-btn" id="submit-btn" onclick="generateVideo()">
+        🚀 开始生成
+    </button>
+
+    <!-- 结果 -->
+    <div class="result-section" id="result-section">
+        <div class="status-text" id="status-text">
+            <span class="status-dot queued"></span>
+            <span id="status-msg">任务已创建，正在排队...</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="error-msg" id="error-msg"></div>
+        <div class="video-result" id="video-result">
+            <video controls id="result-video"></video>
+            <p style="margin-top:8px;font-size:12px;color:var(--text3)">
+                <a id="download-link" href="#" download style="color:var(--accent)">💾 下载视频</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+<footer>© 2026 AI创作工坊 · AI 视频</footer>
+
+<script>
+// ============ 状态管理 ============
+let currentMode = 'text';
+let uploadedImages = [];      // base64
+let pollingTimer = null;
+let currentVideoId = null;
+
+// ============ 模式切换 ============
+document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+        document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        currentMode = this.dataset.mode;
+        const imageArea = document.getElementById('image-area');
+        if (currentMode === 'text') {
+            imageArea.classList.add('hidden');
+        } else {
+            imageArea.classList.remove('hidden');
+            updateUploadHint();
+        }
+    });
+});
+
+function updateUploadHint() {
+    const hint = document.querySelector('#image-area .upload-hint');
+    if (currentMode === 'keyframes') {
+        hint.textContent = '需要上传 2 张关键帧图片';
+    } else if (currentMode === 'image') {
+        hint.textContent = '上传 1 张图片，让 AI 让它动起来';
+    } else {
+        hint.textContent = '支持 JPG / PNG / WebP，最大 10MB';
+    }
+}
+
+// ============ 时长预设 ============
+document.querySelectorAll('.dur-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        document.getElementById('num-frames').value = this.dataset.frames;
+        document.getElementById('frame-rate').value = this.dataset.fps;
+    });
+});
+
+// ============ 图片上传 ============
+const uploadZone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+const imagePreview = document.getElementById('image-preview');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+
+uploadZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+});
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+});
+
+fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+function handleFiles(files) {
+    for (const file of files) {
+        if (!file.type.startsWith('image/')) continue;
+        if (file.size > 10 * 1024 * 1024) {
+            alert('图片不能超过 10MB');
+            continue;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            addImage(e.target.result, file.name);
+        };
+        reader.readAsDataURL(file);
+    }
+    fileInput.value = '';
+}
+
+function addImage(base64, name) {
+    uploadedImages.push({base64, name});
+    renderPreviews();
+}
+
+function addImageUrl() {
+    const url = document.getElementById('url-input').value.trim();
+    if (!url) return;
+    // 直接使用 URL
+    uploadedImages.push({url, name: url.split('/').pop() || 'image'});
+    document.getElementById('url-input').value = '';
+    renderPreviews();
+}
+
+function removeImage(index) {
+    uploadedImages.splice(index, 1);
+    renderPreviews();
+}
+
+function renderPreviews() {
+    imagePreview.innerHTML = uploadedImages.map((img, i) => `
+        <div class="preview-item">
+            <img src="${img.base64 || img.url}" alt="${img.name}">
+            <button class="remove-btn" onclick="removeImage(${i})">×</button>
+        </div>
+    `).join('');
+}
+
+// ============ 高级设置 ============
+function toggleAdvanced() {
+    const toggle = document.querySelector('.adv-toggle');
+    const settings = document.getElementById('adv-settings');
+    toggle.classList.toggle('open');
+    settings.classList.toggle('show');
+}
+
+// ============ 视频生成 ============
+async function generateVideo() {
+    const prompt = document.getElementById('prompt').value.trim();
+    if (!prompt) { alert('请输入提示词'); return; }
+
+    if (currentMode === 'keyframes' && uploadedImages.length < 2) {
+        alert('关键帧模式需要至少 2 张图片');
+        return;
+    }
+    if (currentMode === 'image' && uploadedImages.length < 1) {
+        alert('图生视频需要至少 1 张图片');
+        return;
+    }
+
+    // 停止之前轮询
+    if (pollingTimer) { clearTimeout(pollingTimer); pollingTimer = null; }
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 创建任务中...';
+
+    const resultSection = document.getElementById('result-section');
+    const statusDot = resultSection.querySelector('.status-dot');
+    const statusMsg = document.getElementById('status-msg');
+    const progressFill = document.getElementById('progress-fill');
+    const errorMsg = document.getElementById('error-msg');
+    const videoResult = document.getElementById('video-result');
+    const resultVideo = document.getElementById('result-video');
+
+    resultSection.classList.add('show');
+    videoResult.classList.remove('show');
+    errorMsg.classList.remove('show');
+    progressFill.style.width = '0%';
+    statusDot.className = 'status-dot queued';
+    statusMsg.textContent = '任务已创建，正在排队...';
+    resultVideo.src = '';
+
+    try {
+        const resp = await fetch('api.php?action=create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt,
+                mode: currentMode,
+                images: uploadedImages.map(img => img.url || img.base64),
+                num_frames: parseInt(document.getElementById('num-frames').value) || 121,
+                frame_rate: parseInt(document.getElementById('frame-rate').value) || 24,
+                seed: document.getElementById('seed').value || null,
+                negative_prompt: document.getElementById('neg-prompt').value.trim() || ''
+            })
+        });
+        const data = await resp.json();
+
+        if (!data.success) {
+            showError(data.error || '创建任务失败');
+            btn.disabled = false;
+            btn.textContent = '🚀 重新生成';
+            return;
+        }
+
+        currentVideoId = data.video_id;
+        btn.textContent = '⏳ 生成中...';
+        pollVideoStatus();
+
+    } catch (e) {
+        showError('网络错误: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = '🚀 重新生成';
+    }
+}
+
+function pollVideoStatus() {
+    if (!currentVideoId) return;
+
+    fetch(`api.php?action=query&video_id=${encodeURIComponent(currentVideoId)}`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                showError(data.error || '查询失败');
+                return;
+            }
+
+            const status = data.status;
+            const progress = data.progress || 0;
+
+            const statusDot = document.querySelector('.status-dot');
+            const statusMsg = document.getElementById('status-msg');
+            const progressFill = document.getElementById('progress-fill');
+
+            progressFill.style.width = progress + '%';
+
+            if (status === 'completed') {
+                statusDot.className = 'status-dot completed';
+                statusMsg.textContent = '✅ 视频生成完成！';
+                showVideo(data.video_url);
+                document.getElementById('submit-btn').disabled = false;
+                document.getElementById('submit-btn').textContent = '🚀 再次生成';
+            } else if (status === 'failed') {
+                statusDot.className = 'status-dot failed';
+                statusMsg.textContent = '❌ 生成失败';
+                showError(data.error || '视频生成失败，请重试');
+                document.getElementById('submit-btn').disabled = false;
+                document.getElementById('submit-btn').textContent = '🚀 重新生成';
+            } else if (status === 'in_progress' || status === 'processing') {
+                statusDot.className = 'status-dot processing';
+                statusMsg.textContent = `🎬 正在生成... ${progress}%`;
+                pollingTimer = setTimeout(pollVideoStatus, 5000);
+            } else {
+                // queued
+                statusDot.className = 'status-dot queued';
+                statusMsg.textContent = '⏳ 排队中，请稍候...';
+                pollingTimer = setTimeout(pollVideoStatus, 5000);
+            }
+        })
+        .catch(e => {
+            showError('查询状态失败: ' + e.message);
+            pollingTimer = setTimeout(pollVideoStatus, 8000);
+        });
+}
+
+function showVideo(url) {
+    const videoResult = document.getElementById('video-result');
+    const resultVideo = document.getElementById('result-video');
+    const downloadLink = document.getElementById('download-link');
+
+    videoResult.classList.add('show');
+    resultVideo.src = url;
+    resultVideo.load();
+    downloadLink.href = url;
+}
+
+function showError(msg) {
+    const errorMsg = document.getElementById('error-msg');
+    errorMsg.textContent = msg;
+    errorMsg.classList.add('show');
+    const statusDot = document.querySelector('.status-dot');
+    statusDot.className = 'status-dot failed';
+    document.getElementById('status-msg').textContent = '❌ 出错了';
+}
+</script>
+</body>
+</html>

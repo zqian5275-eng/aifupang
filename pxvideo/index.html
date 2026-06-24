@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI视频工坊 · AI花哥</title>
+<style>
+  :root{--bg:#050507;--card:#101010;--border:#3d3a39;--green:#00d992;--green-dim:rgba(0,217,146,0.08);--green-glow:rgba(0,217,146,0.3);--text:#f2f2f2;--text2:#b8b3b0;--text3:#8b949e;--purple:#a78bfa;}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,'PingFang SC','Microsoft YaHei',sans-serif;min-height:100vh}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(30,41,59,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(30,41,59,.3) 1px,transparent 1px);background-size:60px 60px}
+  header{position:sticky;top:0;z-index:100;background:rgba(5,5,7,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 24px}
+  .header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:56px}
+  .logo{font-size:20px;font-weight:700;color:var(--green);text-decoration:none;display:flex;align-items:center;gap:8px}
+  .logo-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;box-shadow:0 0 8px var(--green-glow)}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}
+  .back-link{color:var(--text2);text-decoration:none;font-size:14px}
+  .back-link:hover{color:var(--green)}
+
+  .container{position:relative;z-index:1;max-width:800px;margin:0 auto;padding:60px 20px;text-align:center}
+  h1{font-size:36px;font-weight:400;margin-bottom:12px;letter-spacing:-.5px}
+  h1 .hl{color:var(--purple)}
+  .sub{font-size:15px;color:var(--text3);margin-bottom:40px;line-height:1.6}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:32px;margin-bottom:20px;text-align:left}
+  .card h3{font-size:16px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .card p{font-size:13px;color:var(--text3);line-height:1.6}
+  .card .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-family:'JetBrains Mono',monospace;background:rgba(167,139,250,.12);color:var(--purple);margin-bottom:8px}
+
+  .steps{margin-top:24px;display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+  .step{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;width:220px;text-align:center}
+  .step-num{font-size:28px;font-weight:700;color:var(--purple);margin-bottom:8px;font-family:'JetBrains Mono',monospace}
+  .step-text{font-size:13px;color:var(--text2)}
+
+  .coming{background:var(--card);border:1px dashed var(--border);border-radius:8px;padding:40px;margin-top:40px;color:var(--text3);font-size:14px}
+</style>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-GEF5QPMJR6"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-GEF5QPMJR6');
+</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/" class="logo"><span class="logo-dot"></span>AI花哥</a>
+    <a href="/" class="back-link">← 返回中枢</a>
+  </div>
+</header>
+
+<div class="container">
+  <h1>🎬 AI<span class="hl">视频</span>工坊</h1>
+  <p class="sub">RunningHub 云端算力 + Pixelle-Video 智能流水线<br>从文字到视频，AI 全流程驱动</p>
+
+  <div class="steps">
+    <div class="step"><div class="step-num">01</div><div class="step-text">输入文字脚本</div></div>
+    <div class="step"><div class="step-num">02</div><div class="step-text">AI 生成配图</div></div>
+    <div class="step"><div class="step-num">03</div><div class="step-text">TTS 语音合成</div></div>
+    <div class="step"><div class="step-num">04</div><div class="step-text">合成最终视频</div></div>
+  </div>
+
+  <div class="card">
+    <span class="tag">RUNNINGHUB</span>
+    <h3>⚡ 已接入工作流</h3>
+    <p>FLUX 图片生成 · Qwen 中文漫画 · Wan2.1 视频生成 · Edge TTS 语音合成 · 20+ 工作流可用</p>
+  </div>
+
+  <div class="card">
+    <span class="tag">PIXELLE-VIDEO</span>
+    <h3>🖥️ 本地运行</h3>
+    <p>Pixelle-Video v0.1.15 已安装在本地，支持 Standard / Asset-Based / Custom 多种流水线模式</p>
+  </div>
+
+  <div class="coming">
+    🚧 Web 端操作界面开发中……<br>目前通过 Hermes Agent 命令行直接生成
+  </div>
+</div>
+</body>
+</html>

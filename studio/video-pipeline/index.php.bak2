@@ -1,0 +1,509 @@
+<?php
+/**
+ * 视频生成流水线
+ * 脚本 → 分镜 → AI视频片段 → 合成
+ * 支持角色三视图 + 场景参考图 → 锁定一致性
+ */
+?><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>视频生成流水线 · AI花哥</title>
+<style>
+:root{--bg:#050507;--card:#0d0d12;--border:#2a2830;--green:#00d992;--gold:#fbbf24;--text:#e8e8ed;--text2:#a09eaa;--text3:#6b6876;--accent:#a78bfa;--rose:#fb7185;--cyan:#22d3ee}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:system-ui,'PingFang SC','Microsoft YaHei',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+header{background:rgba(5,5,7,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:0;z-index:100}
+.header-inner{max-width:1000px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:56px}
+.logo{font-size:18px;font-weight:700;color:var(--green);text-decoration:none;display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}
+.back-link{color:var(--text3);text-decoration:none;font-size:13px}.back-link:hover{color:var(--gold)}
+.container{max-width:1000px;margin:0 auto;padding:24px 20px;flex:1}
+h1{font-size:22px;font-weight:600;margin-bottom:4px}
+.subtitle{font-size:12px;color:var(--text3);margin-bottom:20px}
+
+.panel{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
+.panel h3{font-size:14px;font-weight:500;margin-bottom:12px;color:var(--text2)}
+textarea,input[type="text"]{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text);font-family:inherit;width:100%;transition:border .2s}
+textarea:focus,input[type="text"]:focus{outline:none;border-color:var(--accent)}
+textarea{resize:vertical;min-height:140px}
+.hint{font-size:11px;color:var(--text3);margin-top:6px}
+.btn-row{display:flex;gap:8px;margin-top:12px}
+.btn{padding:8px 18px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text2);transition:all .2s}
+.btn:hover{background:rgba(255,255,255,.1);color:var(--text)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#1a1a2e;font-weight:600}
+.btn.primary:hover{box-shadow:0 0 20px rgba(167,139,250,.3)}
+.btn.danger{background:transparent;border-color:rgba(251,113,133,.3);color:var(--rose);font-size:11px;padding:4px 10px}
+.btn.danger:hover{background:rgba(251,113,133,.1)}
+.btn.small{padding:4px 12px;font-size:11px}
+
+/* Asset cards: characters & scenes */
+.asset-card{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px}
+.asset-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.asset-title{font-size:12px;font-weight:600;color:var(--accent);background:rgba(167,139,250,.1);padding:2px 10px;border-radius:10px}
+.asset-fields{display:flex;flex-direction:column;gap:8px}
+.asset-fields label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:2px}
+.asset-fields textarea{min-height:50px;font-size:11px;padding:8px 10px}
+
+/* Three-view image upload */
+.three-view{display:flex;gap:10px;margin-top:4px}
+.view-slot{flex:1;min-width:0}
+.view-slot .label{font-size:9px;color:var(--text3);text-align:center;margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px}
+.view-box{aspect-ratio:1;border:1px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden;background:rgba(255,255,255,.02);transition:border .2s}
+.view-box:hover{border-color:var(--accent)}
+.view-box img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+.view-box .placeholder{font-size:20px;color:var(--text3)}
+.view-box input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+/* Scene image upload */
+.scene-upload{display:flex;gap:10px;margin-top:4px}
+.scene-box{width:140px;aspect-ratio:16/10;border:1px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden;background:rgba(255,255,255,.02);transition:border .2s;flex-shrink:0}
+.scene-box:hover{border-color:var(--cyan)}
+.scene-box img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+.scene-box .placeholder{font-size:18px;color:var(--text3)}
+.scene-box input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+/* Segment editor */
+.segment-card{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px}
+.segment-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.segment-num{font-size:11px;font-weight:600;color:var(--accent);background:rgba(167,139,250,.1);padding:2px 10px;border-radius:10px}
+.segment-fields label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px}
+.segment-fields input{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--text);width:100%;font-family:inherit}
+.segment-fields input:focus{outline:none;border-color:var(--accent)}
+
+.empty-state{text-align:center;padding:40px;color:var(--text3);font-size:13px}
+
+/* Progress */
+.progress-panel{display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-top:16px}
+.progress-panel.show{display:block}
+.progress-bar{height:4px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden;margin:12px 0}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--cyan));border-radius:2px;transition:width .5s;width:0%}
+.progress-text{font-size:13px;color:var(--text2)}
+.progress-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;animation:pulse 1.5s infinite;background:var(--accent)}
+.progress-dot.done{background:var(--green);animation:none}
+.progress-dot.err{background:var(--rose);animation:none}
+
+.result-panel{display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-top:16px}
+.result-panel.show{display:block}
+.result-panel video{width:100%;max-height:480px;border-radius:8px;background:#000}
+.result-panel .dl{display:inline-block;margin-top:10px;padding:8px 16px;border-radius:8px;background:rgba(0,217,146,.1);border:1px solid rgba(0,217,146,.2);color:var(--green);text-decoration:none;font-size:13px}
+.error{display:none;padding:12px;border-radius:8px;background:rgba(251,113,133,.08);border:1px solid rgba(251,113,133,.2);color:var(--rose);font-size:13px;margin-top:12px}
+.error.show{display:block}
+
+/* Flow indicator */
+.flow-steps{display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:11px;color:var(--text3)}
+.flow-step{padding:4px 10px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--border)}
+.flow-step.active{color:var(--accent);border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.08)}
+.flow-step.done{color:var(--green);border-color:rgba(0,217,146,.2);background:rgba(0,217,146,.05)}
+.flow-arrow{color:var(--text3)}
+
+footer{text-align:center;padding:20px;color:var(--text3);font-size:12px;border-top:1px solid var(--border);margin-top:auto}
+@media(max-width:700px){.three-view,.scene-upload{flex-direction:column}.flow-steps{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+
+<header>
+<div class="header-inner">
+<a href="/" class="logo"><span class="logo-dot"></span>AI花哥</a>
+<a href="/studio/" class="back-link">← 返回工坊</a>
+</div>
+</header>
+
+<div class="container">
+<h1>🎬 视频生成流水线</h1>
+<p class="subtitle">角色三视图 + 场景参考图 + 分镜脚本 → 锁定一致性 → AI动态视频</p>
+
+<div class="flow-steps">
+  <span class="flow-step" id="flow-parse">📝 解析脚本</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step" id="flow-first">🎥 首段生成</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step" id="flow-parallel">⚡ 并行生成</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step" id="flow-concat">🔗 合成输出</span>
+</div>
+
+<!-- Step 1: Script Input -->
+<div class="panel" id="input-panel">
+<h3>📝 粘贴分镜脚本</h3>
+<textarea id="script-input" placeholder="支持两种格式：&#10;&#10;【结构化格式（推荐）】&#10;画面：一只穿红裙的小女孩站在向日葵田里&#10;文字：小葵最喜欢夏天了&#10;&#10;画面：小女孩追着一只蝴蝶跑向远处的风车&#10;文字：她追啊追，笑声洒满了整片田野&#10;&#10;【纯文本格式（空行分段）】&#10;清晨的阳光洒在古老的城墙上&#10;&#10;一只白猫从巷子里优雅地走出来&#10;&#10;它跳上围墙，眺望远处的山峦"></textarea>
+<div class="hint">每段生成约3秒AI视频。建议5-8段，总时长15-25秒效果最佳</div>
+
+<div style="display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap">
+  <span style="font-size:12px;color:var(--text3);white-space:nowrap">⏱ 每段时长：</span>
+  <select id="duration-select" style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;cursor:pointer;font-family:inherit">
+    <option value="3">3秒</option>
+    <option value="5" selected>5秒（默认）</option>
+    <option value="8">8秒</option>
+    <option value="10">10秒</option>
+    <option value="12">12秒</option>
+    <option value="15">15秒</option>
+    <option value="18">18秒（最长）</option>
+  </select>
+</div>
+
+<!-- Character & Scene Settings -->
+<div style="margin-top:14px">
+  <!-- Characters -->
+  <h4 style="font-size:13px;color:var(--text2);margin-bottom:8px">🎭 角色设定</h4>
+  <div id="characters-container"></div>
+  <button class="btn small" onclick="addCharacter()" style="margin-top:6px">＋ 添加角色</button>
+
+  <!-- Scenes -->
+  <h4 style="font-size:13px;color:var(--text2);margin:16px 0 8px">🏞️ 场景设定</h4>
+  <div id="scenes-container"></div>
+  <button class="btn small" onclick="addScene()" style="margin-top:6px">＋ 添加场景</button>
+</div>
+
+<div class="btn-row">
+<button class="btn primary" onclick="parseAndShow()">🔍 解析为分镜</button>
+</div>
+</div>
+
+<!-- Step 2: Storyboard Editor -->
+<div class="panel" id="editor-panel" style="display:none">
+<h3>✏️ 编辑分镜 (<span id="seg-count">0</span>个)</h3>
+<div id="segments-container"></div>
+<div class="btn-row">
+<button class="btn" onclick="addSegment()">＋ 添加分镜</button>
+<button class="btn primary" onclick="startPipeline()" id="submit-btn">🚀 开始生成</button>
+<button class="btn" onclick="resetAll()">↩ 返回编辑脚本</button>
+</div>
+</div>
+
+<!-- Progress -->
+<div class="progress-panel" id="progress-panel">
+<div class="progress-text"><span class="progress-dot" id="progress-dot"></span><span id="status-msg">准备中...</span></div>
+<div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+<div class="error" id="error-msg"></div>
+</div>
+
+<!-- Result -->
+<div class="result-panel" id="result-panel">
+<video id="result-video" controls></video>
+<a class="dl" id="dl-btn" href="#" download>💾 下载视频</a>
+</div>
+</div>
+
+<footer>© 2026 AI创作工坊 · 视频生成流水线</footer>
+
+<script>
+const API = '/studio/video-pipeline/api/';
+const UPLOAD_URL = '/studio/video-pipeline/upload.php';
+let segments = [];
+let pollingTimer = null;
+
+// ---- Character & Scene state ----
+let characters = [];
+let scenes = [];
+let charIdCounter = 0;
+let sceneIdCounter = 0;
+
+// ---- Init ----
+document.addEventListener('DOMContentLoaded', () => {
+    // Start with one default character and scene
+    addCharacter();
+    addScene();
+});
+
+function addCharacter() {
+    const id = ++charIdCounter;
+    characters.push({id, name:'', description:'', _files:[null,null,null], _urls:['','','']});
+    renderCharacters();
+}
+function removeCharacter(id) {
+    characters = characters.filter(c => c.id !== id);
+    renderCharacters();
+}
+function updateChar(id, field, val) {
+    const c = characters.find(c => c.id === id);
+    if (c) c[field] = val;
+}
+
+function renderCharacters() {
+    const container = document.getElementById('characters-container');
+    container.innerHTML = characters.map(c => `
+    <div class="asset-card">
+      <div class="asset-header">
+        <span class="asset-title">角色 #${c.id}</span>
+        <button class="btn danger" onclick="removeCharacter(${c.id})">删除</button>
+      </div>
+      <div class="asset-fields">
+        <div><label>角色名称</label><input type="text" value="${escHtml(c.name)}" onchange="updateChar(${c.id},'name',this.value)" placeholder="如：小红帽、大灰狼"></div>
+        <div><label>角色描述（外貌、服装、体型、年龄等）</label><textarea onchange="updateChar(${c.id},'description',this.value)" placeholder="如：8岁女孩，金色短发，红色斗篷，白色围裙，圆脸大眼睛，可爱活泼">${escHtml(c.description)}</textarea></div>
+        <div>
+          <label>📷 三视图（正面 / 侧面 / 背面，建议上传）</label>
+          <div class="three-view">
+            ${['正面','侧面','背面'].map((label,idx) => `
+            <div class="view-slot">
+              <div class="label">${label}</div>
+              <div class="view-box" onclick="this.querySelector('input').click()">
+                ${c._urls[idx] ? `<img src="${c._urls[idx]}" alt="${label}">` : '<span class="placeholder">＋</span>'}
+                <input type="file" accept="image/*" onchange="previewChar(this,${c.id},${idx})">
+              </div>
+            </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+    `).join('');
+}
+
+function addScene() {
+    const id = ++sceneIdCounter;
+    scenes.push({id, name:'', description:'', _file:null, _url:''});
+    renderScenes();
+}
+function removeScene(id) {
+    scenes = scenes.filter(s => s.id !== id);
+    renderScenes();
+}
+function updateScene(id, field, val) {
+    const s = scenes.find(s => s.id === id);
+    if (s) s[field] = val;
+}
+
+function renderScenes() {
+    const container = document.getElementById('scenes-container');
+    container.innerHTML = scenes.map(s => `
+    <div class="asset-card">
+      <div class="asset-header">
+        <span class="asset-title">场景 #${s.id}</span>
+        <button class="btn danger" onclick="removeScene(${s.id})">删除</button>
+      </div>
+      <div class="asset-fields">
+        <div><label>场景名称</label><input type="text" value="${escHtml(s.name)}" onchange="updateScene(${s.id},'name',this.value)" placeholder="如：森林小路、城堡大厅"></div>
+        <div><label>场景描述（光线、色调、环境细节）</label><textarea onchange="updateScene(${s.id},'description',this.value)" placeholder="如：阳光透过树叶洒在密林小径上，暖色调，梦幻氛围">${escHtml(s.description)}</textarea></div>
+        <div>
+          <label>🖼️ 场景参考图</label>
+          <div class="scene-upload">
+            <div class="scene-box" onclick="this.querySelector('input').click()">
+              ${s._url ? `<img src="${s._url}" alt="场景">` : '<span class="placeholder">＋</span>'}
+              <input type="file" accept="image/*" onchange="previewScene(this,${s.id})">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    `).join('');
+}
+
+// ---- Image preview ----
+function previewChar(input, charId, idx) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const c = characters.find(c => c.id === charId);
+    if (!c) return;
+    c._files[idx] = file;
+    const url = URL.createObjectURL(file);
+    c._urls[idx] = url;
+    renderCharacters();
+}
+
+function previewScene(input, sceneId) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const s = scenes.find(s => s.id === sceneId);
+    if (!s) return;
+    s._file = file;
+    s._url = URL.createObjectURL(file);
+    renderScenes();
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ---- Parse script into storyboard ----
+function parseAndShow() {
+    const text = document.getElementById('script-input').value.trim();
+    if (!text) { alert('请先粘贴脚本'); return; }
+    const hasVisual = /画面[：:]/.test(text);
+    if (hasVisual) {
+        segments = parseStructured(text);
+    } else {
+        const parts = text.split(/\n\s*\n/).filter(p => p.trim());
+        if (parts.length <= 1) {
+            const lines = text.split('\n').filter(l => l.trim());
+            segments = lines.slice(0,12).map(line => ({image_prompt: line, narration: ''}));
+        } else {
+            segments = parts.slice(0,12).map(part => ({image_prompt: cleanText(part), narration: ''}));
+        }
+    }
+    renderSegments();
+    document.getElementById('input-panel').style.display = 'none';
+    document.getElementById('editor-panel').style.display = 'block';
+}
+
+function parseStructured(text) {
+    const result = [];
+    const blocks = text.split(/\n(?=画面[：:])/).filter(p => p.trim());
+    for (const block of blocks.slice(0,12)) {
+        let image_prompt = '';
+        const imgMatch = block.match(/画面[：:]\s*(.+?)(?=\n(?:文字|标题|作者|$)|$)/s);
+        if (imgMatch) image_prompt = imgMatch[1].trim();
+        if (image_prompt) result.push({image_prompt, narration:''});
+    }
+    return result;
+}
+
+function cleanText(text) {
+    return text.replace(/^[0-9]+[\.\、\)）]\s*/g,'')
+        .replace(/^[图片画面视频]+\s*[：:]\s*/g,'').trim();
+}
+
+// ---- Segment Editor ----
+function renderSegments() {
+    const container = document.getElementById('segments-container');
+    document.getElementById('seg-count').textContent = segments.length;
+    container.innerHTML = segments.map((seg,i) => `
+      <div class="segment-card">
+        <div class="segment-header">
+          <span class="segment-num">分镜 ${i+1}</span>
+          <button class="btn danger" onclick="removeSegment(${i})">删除</button>
+        </div>
+        <div class="segment-fields">
+          <label>🎬 画面描述（用于生成视频）</label>
+          <input type="text" value="${escHtml(seg.image_prompt)}" onchange="updateSeg(${i},'image_prompt',this.value)" placeholder="描述这个分镜的画面内容...">
+        </div>
+      </div>`).join('');
+}
+function updateSeg(i,key,val){segments[i][key]=val}
+function removeSegment(i){segments.splice(i,1);renderSegments()}
+function addSegment(){segments.push({image_prompt:'',narration:''});renderSegments()}
+function resetAll(){segments=[];document.getElementById('editor-panel').style.display='none';document.getElementById('input-panel').style.display='block';document.getElementById('progress-panel').classList.remove('show');document.getElementById('result-panel').classList.remove('show');resetFlow()}
+function resetFlow(){document.querySelectorAll('.flow-step').forEach(el=>el.classList.remove('active','done'))}
+
+// ---- Upload images then start pipeline ----
+async function startPipeline() {
+    const valid = segments.filter(s => (s.image_prompt||'').trim());
+    if (valid.length===0){alert('请至少填写一个分镜');return}
+    segments=valid;
+    const btn=document.getElementById('submit-btn');
+    if(pollingTimer){clearTimeout(pollingTimer);pollingTimer=null}
+    btn.disabled=true;btn.textContent='⏳ 上传图片...';
+    document.getElementById('progress-panel').classList.add('show');
+    document.getElementById('result-panel').classList.remove('show');
+    document.getElementById('error-msg').classList.remove('show');
+    document.getElementById('progress-fill').style.width='0%';
+    document.getElementById('status-msg').textContent='上传参考图片...';
+    document.getElementById('progress-dot').className='progress-dot';
+    resetFlow();
+
+    try {
+        // Upload all images first
+        const charsData = await uploadCharacters();
+        const scenesData = await uploadScenes();
+
+        btn.textContent = '⏳ 提交任务...';
+        document.getElementById('status-msg').textContent = '提交任务...';
+
+        const duration = parseInt(document.getElementById('duration-select').value) || 5;
+        const resp = await fetch(API, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({segments, characters:charsData, scenes:scenesData, duration})
+        });
+        const data = await resp.json();
+        if(!data.success){showError(data.error);return}
+        btn.textContent='⏳ 生成中...';
+        pollProgress(data.job_id);
+    } catch(e){showError('错误: '+e.message)}
+}
+
+async function uploadCharacters() {
+    return Promise.all(characters.filter(c=>c.name||c.description||c._files.some(f=>f)).map(async c=>{
+        const images=[];
+        for(let i=0;i<3;i++){
+            if(c._files[i]){
+                const url=await uploadImage(c._files[i]);
+                if(url) images.push(url);
+            }
+        }
+        return {name:c.name, description:c.description, images};
+    }));
+}
+
+async function uploadScenes() {
+    return Promise.all(scenes.filter(s=>s.name||s.description||s._file).map(async s=>{
+        let image='';
+        if(s._file){
+            image=await uploadImage(s._file)||'';
+        }
+        return {name:s.name, description:s.description, image};
+    }));
+}
+
+async function uploadImage(file) {
+    const fd=new FormData();
+    fd.append('image',file);
+    const r=await fetch(UPLOAD_URL,{method:'POST',body:fd});
+    const d=await r.json();
+    if(d.success) return d.url;
+    console.error('Upload failed:',d.error);
+    return null;
+}
+
+// ---- Progress polling ----
+function pollProgress(jobId) {
+    fetch(API+'progress/'+jobId).then(r=>r.json()).then(data=>{
+        const fill=document.getElementById('progress-fill');
+        const msg=document.getElementById('status-msg');
+        const dot=document.getElementById('progress-dot');
+        updateFlow(data);
+        if(data.status==='completed'){
+            fill.style.width='100%';msg.textContent='✅ 视频生成完成！';
+            dot.className='progress-dot done';
+            document.getElementById('flow-concat').classList.add('done');
+            showResult(data.url);
+            document.getElementById('submit-btn').disabled=false;
+            document.getElementById('submit-btn').textContent='🚀 再次生成';
+        }else if(data.status==='failed'){
+            dot.className='progress-dot err';msg.textContent='❌ 生成失败';
+            showError(data.error);
+            document.getElementById('submit-btn').disabled=false;
+            document.getElementById('submit-btn').textContent='🚀 重新生成';
+        }else{
+            const total=data.total||1,current=data.current||0,step=data.step||'';
+            const pct=Math.round((current/total)*100);
+            fill.style.width=pct+'%';
+            const msgs={video:`🎬 第${current}/${total}段·${current===1?'首段生成':'并行生成'}`,extract_frame:'🖼️ 提取关键帧...',concat:'🔗 拼接所有片段...'};
+            msg.textContent=msgs[step]||`🎬 ${step}`;
+            pollingTimer=setTimeout(()=>pollProgress(jobId),5000);
+        }
+    }).catch(()=>{pollingTimer=setTimeout(()=>pollProgress(jobId),8000)});
+}
+
+function updateFlow(data){
+    const step=data.step||'';const isDone=data.status==='completed';
+    if(isDone){document.querySelectorAll('.flow-step').forEach(el=>el.classList.add('done'));return}
+    document.querySelectorAll('.flow-step').forEach(el=>el.classList.remove('active','done'));
+    if(step==='video'&&data.current===1){
+        document.getElementById('flow-parse').classList.add('done');document.getElementById('flow-first').classList.add('active');
+    }else if(step==='extract_frame'){
+        document.getElementById('flow-parse').classList.add('done');document.getElementById('flow-first').classList.add('done');
+        document.getElementById('flow-parallel').classList.add('active');
+    }else if(step==='video'&&data.current>1){
+        document.getElementById('flow-parse').classList.add('done');document.getElementById('flow-first').classList.add('done');
+        document.getElementById('flow-parallel').classList.add('active');
+    }else if(step==='concat'){
+        document.getElementById('flow-parse').classList.add('done');document.getElementById('flow-first').classList.add('done');
+        document.getElementById('flow-parallel').classList.add('done');document.getElementById('flow-concat').classList.add('active');
+    }
+}
+
+function showResult(url){
+    document.getElementById('result-panel').classList.add('show');
+    document.getElementById('result-video').src=url;
+    document.getElementById('dl-btn').href=url;
+}
+function showError(msg){
+    const el=document.getElementById('error-msg');
+    el.textContent=msg;el.classList.add('show');
+    document.getElementById('submit-btn').disabled=false;
+    document.getElementById('submit-btn').textContent='🚀 重新生成';
+}
+</script>
+</body>
+</html>
