@@ -908,16 +908,6 @@
             localStorage.setItem('research_risk_accepted', '1');
         }
         // 登录检查
-        function checkLogin() {
-            fetch('/studio/check_login.php', {credentials: 'same-origin'})
-                .then(function(r) {
-                    if (r.status === 401) {
-                        window.location.href = '/studio/login.php?redirect=' + encodeURIComponent(window.location.href);
-                    }
-                })
-                .catch(function() {});
-        }
-        checkLogin();
     </script>
     <!-- 顶部导航 -->
     <div class="header">
