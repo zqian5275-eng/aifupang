@@ -50,6 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register'])) {
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>注册 · AI花哥</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="免费注册AI花哥会员，解锁AI创作工坊、A股智能投研、每日复盘等专业功能。">
 <style>
 :root{--bg:#050507;--card:#101010;--border:#3d3a39;--green:#00d992;--green-glow:rgba(0,217,146,.3);--gold:#fbbf24;--text:#f2f2f2;--text2:#b8b3b0;--text3:#8b949e;--rose:#fb7185}
 *{margin:0;padding:0;box-sizing:border-box}

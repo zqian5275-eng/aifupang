@@ -9,6 +9,7 @@ $info = get_vip_info();
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>家庭法律助手 · AI花哥</title>
+<meta name="description" content="免费法律咨询，AI智能分析婚姻、劳动、借贷、租房等法律问题。VIP会员可生成专业法律文书。">
 <style>
 :root{--bg:#0a0a0f;--surface:#14141a;--border:#2a2a35;--gold:#f0c060;--cyan:#4dc9f6;--text:#e8e8ec;--text2:#9898a8;--danger:#f87171;--green:#4ade80;--vip:#f59e0b}
 *{margin:0;padding:0;box-sizing:border-box}
