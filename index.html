@@ -217,6 +217,46 @@
     color: var(--text3); font-size: 12px;
   }
   footer span { color: var(--green); }
+
+  /* === AUTH BUTTONS === */
+  .nav-auth { display: flex; align-items: center; gap: 10px; margin-left: 16px; }
+  .btn-login, .btn-register {
+    padding: 6px 16px; border-radius: 6px; font-size: 13px;
+    font-weight: 500; text-decoration: none; cursor: pointer;
+    transition: all 0.2s; border: 1px solid transparent;
+    font-family: inherit;
+  }
+  .btn-login {
+    background: transparent; color: var(--text2); border-color: var(--border);
+  }
+  .btn-login:hover { border-color: var(--green); color: var(--green); }
+  .btn-register {
+    background: var(--green); color: var(--bg); font-weight: 600;
+  }
+  .btn-register:hover { box-shadow: 0 0 16px var(--green-glow); }
+  .user-menu {
+    position: relative; display: flex; align-items: center; gap: 6px;
+    color: var(--green); font-size: 13px; cursor: pointer;
+    padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .user-menu:hover { border-color: var(--green); }
+  .user-dropdown {
+    display: none; position: absolute; top: 100%; right: 0; margin-top: 6px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 4px; min-width: 120px; z-index: 200;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  }
+  .user-menu:hover .user-dropdown, .user-dropdown.show { display: block; }
+  .user-dropdown a {
+    display: block; padding: 8px 14px; border-radius: 4px;
+    color: var(--text2); text-decoration: none; font-size: 12px;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .user-dropdown a:hover { background: rgba(0,217,146,0.08); color: var(--green); }
+  .user-dropdown a.logout { color: var(--rose); }
+  .user-dropdown a.logout:hover { background: rgba(251,113,133,0.08); }
+
 @media(max-width:768px){
 body{padding:0;font-size:14px}
 header{padding:0 12px}
@@ -291,6 +331,10 @@ footer{padding:24px 12px;margin-top:32px}
       <a href="/calc/">计算器</a>
       <a href="/more/">工具、游戏集</a>
     </nav>
+    <div class="nav-auth" id="auth-area">
+      <a href="/studio/login.php" class="btn-login">登录</a>
+      <a href="/studio/register.php" class="btn-register">注册</a>
+    </div>
   </div>
 </header>
 
@@ -375,7 +419,7 @@ footer{padding:24px 12px;margin-top:32px}
     <a href="/studio/" class="module-card">
       <div class="card-body"><div class="module-icon">🎬</div>
       <h3>AI创作工坊</h3>
-      <div class="desc">会员专属 · AI视频/图片/语音生成</div>
+      <div class="desc">免费注册 · AI视频/图片/语音生成</div>
       </div><div class="card-spacer"></div><span class="tag">STUDIO</span>
     </a>
   </div>
@@ -449,6 +493,25 @@ footer{padding:24px 12px;margin-top:32px}
 <script>
   document.getElementById('today-date').textContent =
     new Date().toLocaleDateString('zh-CN', {year:'numeric',month:'long',day:'numeric',weekday:'short'});
+
+  // Auth state check
+  (async function() {
+    const authArea = document.getElementById('auth-area');
+    try {
+      const resp = await fetch('/check_auth.php', {credentials: 'same-origin'});
+      const data = await resp.json();
+      if (data.logged_in) {
+        authArea.innerHTML = '<div class="user-menu">' +
+          '\u{1f464} ' + data.username +
+          '<div class="user-dropdown">' +
+          '<a href="/studio/">创作工坊</a>' +
+          '<a href="/studio/logout.php" class="logout">退出登录</a>' +
+          '</div></div>';
+      }
+    } catch(e) {
+      // API not available, show default login/register buttons
+    }
+  })();
 </script>
 </body>
 </html>

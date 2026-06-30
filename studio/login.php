@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>登录 · AI创作工坊</title>
+<title>登录 · AI花哥</title>
 <style>
 :root{--bg:#050507;--card:#101010;--border:#3d3a39;--green:#00d992;--green-glow:rgba(0,217,146,.3);--text:#f2f2f2;--text2:#b8b3b0;--text3:#8b949e;--purple:#a78bfa}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -50,15 +50,15 @@ h1 span{color:var(--green)}
 </head>
 <body>
 <div class="login-box">
-<h1>AI<span>创作</span>工坊</h1>
-<p class="sub">会员登录</p>
+<h1>AI<span>花哥</span></h1>
+<p class="sub">登录</p>
 <?php if($error): ?><div class="error"><?= $error ?></div><?php endif; ?>
 <form method="post">
 <div class="input-group"><label>邮箱</label><input name="username" required autofocus></div>
 <div class="input-group"><label>密码</label><input type="password" name="password" required></div>
 <button class="btn" type="submit">登 录</button>
 </form>
-<div class="links"><a href="register.php">注册新账号</a></div>
+<div class="links"><a href="register.php">免费注册新账号</a></div>
 <div class="back"><a href="/">← 返回首页</a></div>
 </div>
 </body>
