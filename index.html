@@ -237,20 +237,20 @@
   .user-menu {
     position: relative; display: flex; align-items: center; gap: 6px;
     color: var(--green); font-size: 13px; cursor: pointer;
-    padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
-    transition: border-color 0.2s;
+    padding: 6px 12px 20px 12px; border-radius: 6px; border: 1px solid var(--border);
+    transition: border-color 0.2s; user-select: none;
   }
   .user-menu:hover { border-color: var(--green); }
   .user-dropdown {
-    display: none; position: absolute; top: 100%; right: 0; margin-top: 6px;
+    display: none; position: absolute; top: 100%; right: 0; margin-top: -2px;
     background: var(--card); border: 1px solid var(--border); border-radius: 8px;
     padding: 4px; min-width: 120px; z-index: 200;
     box-shadow: 0 8px 24px rgba(0,0,0,0.6);
   }
   .user-menu:hover .user-dropdown, .user-dropdown.show { display: block; }
   .user-dropdown a {
-    display: block; padding: 8px 14px; border-radius: 4px;
-    color: var(--text2); text-decoration: none; font-size: 12px;
+    display: block; padding: 10px 16px; border-radius: 4px;
+    color: var(--text2); text-decoration: none; font-size: 13px;
     transition: all 0.15s; white-space: nowrap;
   }
   .user-dropdown a:hover { background: rgba(0,217,146,0.08); color: var(--green); }
@@ -501,16 +501,24 @@ footer{padding:24px 12px;margin-top:32px}
       const resp = await fetch('/check_auth.php', {credentials: 'same-origin'});
       const data = await resp.json();
       if (data.logged_in) {
-        authArea.innerHTML = '<div class="user-menu">' +
+        authArea.innerHTML = '<div class="user-menu" id="user-menu-btn">' +
           '\u{1f464} ' + data.username +
-          '<div class="user-dropdown">' +
+          '<div class="user-dropdown" id="user-dropdown">' +
           '<a href="/studio/">创作工坊</a>' +
           '<a href="/studio/logout.php" class="logout">退出登录</a>' +
           '</div></div>';
+        // Click toggle
+        document.getElementById('user-menu-btn').addEventListener('click', function(e) {
+          e.stopPropagation();
+          document.getElementById('user-dropdown').classList.toggle('show');
+        });
+        // Click outside to close
+        document.addEventListener('click', function() {
+          var dd = document.getElementById('user-dropdown');
+          if (dd) dd.classList.remove('show');
+        });
       }
-    } catch(e) {
-      // API not available, show default login/register buttons
-    }
+    } catch(e) {}
   })();
 </script>
 </body>
