@@ -1,0 +1,54 @@
+# AI花哥 · 赛博中枢
+> 10年私募副总运营的AI+金融工具站，用AI重构信息获取方式
+
+## 核心模块
+
+### A股投研
+- 实时行情、K线图、龙虎榜、融资融券、北向资金: https://aifupang.com/research/
+- AI智能分析（技术面+资金面+估值面+消息面）: https://aifupang.com/research/
+- 宏观数据（中国/美国）: https://aifupang.com/research/
+
+### A股每日复盘
+- 技术面·资金面·消息面私募视角拆解: https://aifupang.com/review/
+- 板块轮动+资金流向+百日新高+风险提示: https://aifupang.com/review/
+
+### AI创作工坊
+- AI视频/图片/语音生成，免费注册使用: https://aifupang.com/studio/
+- 支持文字生成视频、图片生成视频、TTS语音合成: https://aifupang.com/studio/
+
+### GIF表情包制作
+- 拍照/上传自动抠图生成GIF动图表情包: https://aifupang.com/gif/
+- 文字、贴纸、滤镜叠加编辑: https://aifupang.com/gif/
+
+### 家庭法律助手
+- 免费法律咨询（婚姻/劳动/借贷/租房）: https://aifupang.com/lawyer/
+- AI智能分析+VIP文书生成: https://aifupang.com/lawyer/
+
+## 其他模块
+
+### 教育
+- 古诗词视频·幼小衔接·学习资源: https://aifupang.com/edu/
+- 奇妙学习乐园（幼小衔接闯关）: https://aifupang.com/edu/summer-camp/
+
+### 电视直播
+- B站直播间合集，侧边栏一键切换: https://aifupang.com/tv/
+
+### 综合计算器
+- 保险·贷款·法律费用一键计算: https://aifupang.com/calc/
+
+### 音乐作品集
+- Suno AI原创，中国风·古风·史诗: https://aifupang.com/music/
+
+### 文章博客
+- 私募视角·AI×金融·趋势洞察: https://aifupang.com/blog/
+
+### 生活狼狈时刻
+- 分享尴尬、翻车、社死瞬间: https://aifupang.com/moments/
+
+### 工具、游戏集
+- 网页小游戏·AI工具·创意实验: https://aifupang.com/more/
+
+## 运营者
+- 花哥不花，10年私募副总，抖音号 731295726
+- ICP备案: 闽ICP备2026013827号-2
+- 公安备案: 闽公网安备35020502001061号
