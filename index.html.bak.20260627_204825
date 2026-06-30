@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI花哥 · 赛博中枢 | A股每日复盘 · AI投研 · GIF表情包 · 教育 · 教育</title>
+<title>AI花哥 · 赛博中枢 | A股每日复盘 · AI投研 · GIF表情包 · 古诗词视频</title>
 <link rel="canonical" href="https://aifupang.com/">
 <meta name="baidu-site-verification" content="codeva-8dRVUortj8">
-<meta name="description" content="AI花哥 · 10年私募副总，分享A股每日复盘、AI智能投研、GIF表情包制作、教育学习、AI创作工坊、电视直播。汇集FLUX图片、Wan2.1视频、TTS语音合成等AI工具。">
-<meta name="keywords" content="AI花哥,花哥不花,A股复盘,A股投研,AI投研,GIF表情包,教育,古诗词,视频生成,AI视频,FLUX,Wan2.1,TTS,AI创作,电视直播,赛博朋克">
-<meta property="og:title" content="AI花哥 · 赛博中枢 | A股每日复盘 · AI投研 · GIF表情包 · 教育">
+<meta name="description" content="AI花哥 · 10年私募副总，分享A股每日复盘、AI智能投研、GIF表情包制作、古诗词视频生成、AI创作工坊、电视直播。汇集FLUX图片、Wan2.1视频、TTS语音合成等AI工具。">
+<meta name="keywords" content="AI花哥,花哥不花,A股复盘,A股投研,AI投研,GIF表情包,古诗词,视频生成,AI视频,FLUX,Wan2.1,TTS,AI创作,电视直播,赛博朋克">
+<meta property="og:title" content="AI花哥 · 赛博中枢 | A股每日复盘 · AI投研 · GIF表情包">
 <meta property="og:description" content="10年私募副总视角，A股每日复盘、AI智能投研、GIF表情包制作、古诗词视频生成、AI创作工坊。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://aifupang.com/">
@@ -23,7 +23,7 @@
   "@type": "WebSite",
   "name": "AI花哥 · 赛博中枢",
   "url": "https://aifupang.com/",
-  "description": "A股每日复盘、AI智能投研、GIF表情包制作、教育(古诗词·幼小衔接)、AI创作工坊",
+  "description": "A股每日复盘、AI智能投研、GIF表情包制作、古诗词视频生成、AI创作工坊",
   "potentialAction": {
     "@type": "SearchAction",
     "target": "https://aifupang.com/search?q={search_term_string}",
@@ -281,7 +281,7 @@ footer{padding:24px 12px;margin-top:32px}
     <nav class="nav-links">
       <a href="/research/">研究</a>
       <a href="/review/">复盘</a>
-      <a href="/edu/">教育</a>
+      <a href="/poetry/">诗词</a>
       <a href="/lawyer/">法律</a>
       <a href="/studio/">视频</a>
       <a href="/tv/">电视</a>
@@ -303,7 +303,7 @@ footer{padding:24px 12px;margin-top:32px}
     用<span class="hl">AI</span>重构<br>信息获取方式
   </h1>
   <p>
-    每日复盘、AI视频创作、教育学习、网页游戏——一个赛博中枢，连接所有数字工具。
+    每日复盘、小学古诗词、AI视频创作、网页游戏——一个赛博中枢，连接所有数字工具。
   </p>
 
 <div class="status-bar">
@@ -350,13 +350,13 @@ footer{padding:24px 12px;margin-top:32px}
     </a>
   </div>
 
-  <!-- 教育 -->
+  <!-- 小学必背古诗词 -->
   <div class="card-poetry">
-    <a href="/edu/" class="module-card">
-      <div class="card-body"><div class="module-icon">📚</div>
-      <h3>教育</h3>
-      <div class="desc">古诗词 · 幼小衔接 · 学习资源</div>
-      </div><div class="card-spacer"></div><span class="tag">EDU</span>
+    <a href="/poetry/" class="module-card">
+      <div class="card-body"><div class="module-icon">📜</div>
+      <h3>小学必背古诗词</h3>
+      <div class="desc">75首必背诗词，注音+译文+赏析</div>
+      </div><div class="card-spacer"></div><span class="tag">POETRY</span>
     </a>
   </div>
 

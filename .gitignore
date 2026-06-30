@@ -62,3 +62,7 @@ research/venv/
 # 已删除的敏感脚本
 studio/init_admin.php
 studio/init_admin.php.REMOVED
+studio/data/users.json.test_back
+lawyer/apiclient_cert.pem
+lawyer/apiclient_key.pem
+lawyer/wechat_pay_config.php

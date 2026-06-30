@@ -1,1 +1,162 @@
-player.html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电视直播</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:#0a0a0a;color:#e0e0e0;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
+#app{display:flex;height:100vh}
+#sidebar{width:240px;background:#111;overflow-y:auto;flex-shrink:0;border-right:1px solid #222}
+#sidebar::-webkit-scrollbar{width:4px}
+#sidebar::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+#sidebar h3{padding:12px 16px;font-size:14px;color:#999;border-bottom:1px solid #222}
+#group-tabs{display:flex;gap:4px;padding:8px;flex-wrap:wrap}
+#group-tabs .gt{padding:4px 10px;border-radius:12px;font-size:12px;cursor:pointer;background:#222;border:1px solid #333;color:#ccc;transition:.15s}
+#group-tabs .gt.active{background:#1976d2;border-color:#1976d2;color:#fff}
+#channel-list{padding:4px 0}
+.ch-item{padding:8px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;transition:.1s}
+.ch-item:hover{background:#1a1a1a}
+.ch-item.active{background:#1a237e;color:#fff}
+#player-container{flex:1;display:flex;flex-direction:column;background:#000}
+#player-header{padding:10px 16px;background:#1a1a1a;display:flex;align-items:center;gap:12px;border-bottom:1px solid #222}
+#player-header .cn{font-size:15px;font-weight:bold}
+#player-header .cs{font-size:11px;color:#888}
+#video-wrapper{flex:1;position:relative;background:#000;display:flex;align-items:center;justify-content:center}
+#video-wrapper video{width:100%;height:100%;background:#000}
+#video-wrapper .placeholder{color:#555;font-size:14px;text-align:center}
+#video-wrapper .placeholder .icon{font-size:48px;margin-bottom:12px}
+#player-status{padding:4px 16px;font-size:11px;color:#666}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="sidebar">
+<h3>电视频道</h3>
+<div id="group-tabs"></div>
+<div id="channel-list"></div>
+</div>
+<div id="player-container">
+<div id="player-header">
+<span class="cn" id="current-name">请选择频道</span>
+<span class="cs" id="current-status"></span>
+</div>
+<div id="video-wrapper">
+<video id="video" controls autoplay playsinline></video>
+<div class="placeholder" id="placeholder">
+<div class="icon">&#9654;</div>
+<div>点击左侧频道开始观看</div>
+</div>
+</div>
+<div id="player-status">共 <span id="total-channels">加载中...</span> 个频道</div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+var API_BASE="/tv";
+var channels=[],groups=["全部"],currentGroup="全部";
+var currentChannel=null,hls=null;
+
+function fetchChannels(){
+document.getElementById("total-channels").textContent="加载中...";
+fetch(API_BASE+"/api/channels")
+.then(function(r){return r.json()})
+.then(function(data){
+channels=data;
+var uG=[];
+for(var i=0;i<data.length;i++){
+var g=data[i].group;
+if(uG.indexOf(g)===-1)uG.push(g);
+}
+groups=["全部"].concat(uG);
+renderGroups();
+renderChannels();
+document.getElementById("total-channels").textContent="共 "+data.length+" 个频道";
+})
+.catch(function(err){
+document.getElementById("total-channels").textContent="加载失败: "+err.message;
+});
+}
+
+function renderGroups(){
+var c=document.getElementById("group-tabs");
+c.innerHTML="";
+for(var i=0;i<groups.length;i++){
+var s=document.createElement("span");
+s.className="gt"+(groups[i]===currentGroup?" active":"");
+s.textContent=groups[i];
+s.onclick=(function(g){return function(){currentGroup=g;renderGroups();renderChannels();}})(groups[i]);
+c.appendChild(s);
+}
+}
+
+function renderChannels(){
+var c=document.getElementById("channel-list");
+c.innerHTML="";
+var f=channels;
+if(currentGroup!=="全部")f=channels.filter(function(ch){return ch.group===currentGroup});
+for(var i=0;i<f.length;i++){
+var d=document.createElement("div");
+d.className="ch-item";
+d.setAttribute("data-id",f[i].id);
+d.innerHTML=f[i].name;
+d.onclick=(function(ch){return function(){playChannel(ch);}})(f[i]);
+c.appendChild(d);
+}
+}
+
+function playChannel(ch){
+document.getElementById("current-name").textContent=ch.name;
+document.getElementById("current-status").textContent="正在获取直播流...";
+var items=document.querySelectorAll(".ch-item");
+for(var i=0;i<items.length;i++){
+items[i].classList.remove("active");
+if(items[i].getAttribute("data-id")===ch.id)items[i].classList.add("active");
+}
+if(hls){hls.destroy();hls=null;}
+var video=document.getElementById("video");
+video.style.display="block";
+document.getElementById("placeholder").style.display="none";
+document.getElementById("current-status").textContent="正在获取直播流...";
+
+var streamUrl = ch.url;
+if(!streamUrl){
+document.getElementById("current-status").textContent="该频道暂无可用流";
+return;
+}
+
+// HLS.js 播放
+if(Hls.isSupported()){
+hls = new Hls({
+enableWorker: true,
+lowLatencyMode: true,
+});
+hls.loadSource(streamUrl);
+hls.attachMedia(video);
+hls.on(Hls.Events.MANIFEST_PARSED, function(){
+video.play().catch(function(){});
+document.getElementById("current-status").textContent="正在播放";
+});
+hls.on(Hls.Events.ERROR, function(event, data){
+if(data.fatal){
+console.error("HLS fatal error:", data.type, data.details);
+document.getElementById("current-status").textContent="播放出错，该流可能已失效";
+}
+});
+} else if(video.canPlayType('application/vnd.apple.mpegurl')){
+video.src = streamUrl;
+video.addEventListener('loadedmetadata', function(){
+video.play().catch(function(){});
+document.getElementById("current-status").textContent="正在播放";
+});
+}
+}
+
+document.addEventListener("DOMContentLoaded",function(){
+fetchChannels();
+});
+</script>
+</body>
+</html>

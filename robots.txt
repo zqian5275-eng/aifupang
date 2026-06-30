@@ -1,7 +1,18 @@
 User-agent: *
 Allow: /
+Allow: /edu/
+Allow: /edu/summer-camp/
+Allow: /poetry/
 Allow: /review/
 Allow: /research/
 Allow: /studio/
+Allow: /gif/
+Allow: /tv/
+Allow: /calc/
+Allow: /music/
+Allow: /blog/
+Allow: /lawyer/
+Allow: /moments/
+Allow: /more/
 
 Sitemap: https://aifupang.com/sitemap.xml

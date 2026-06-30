@@ -1,0 +1,2346 @@
+import pandas as pd
+import json
+from datetime import datetime
+import tushare as ts
+import sys
+
+TRADE_DATE = '20260622'
+DISPLAY_DATE = '2026年06月22日'
+OUTPUT_FILE = f'{DISPLAY_DATE}A股详细复盘报告.html'
+
+# 配置Tushare
+TOKEN = '8c40fdd74c2af0322ddd94c079a7b92c6d9c150e6a339b51b936c5db'
+pro = ts.pro_api(TOKEN)
+
+def read_tsv_file(filepath):
+    try:
+        df = pd.read_csv(filepath, sep='\t', encoding='gbk', on_bad_lines='skip')
+        # 跳过重复的表头行 - 检查第一行是否是表头字符串
+        if len(df) > 0:
+            first_row = df.iloc[0]
+            # 如果第一行有多个表头字符串，说明是重复的表头，删除它
+            header_strings = ['代码', '名称', '涨跌幅', '涨幅', '涨跌', '成交量', '成交额', '总金额']
+            header_count = 0
+            for val in first_row:
+                if str(val) in header_strings:
+                    header_count += 1
+            if header_count >= 2:
+                df = df.iloc[1:].reset_index(drop=True)
+        # 自动处理列名：去除空格，去除引号
+        df.columns = [str(col).strip().replace("'", "").replace('"', '') for col in df.columns]
+        return df
+    except Exception as e:
+        print(f"尝试gbk编码失败: {e}")
+        try:
+            df = pd.read_csv(filepath, sep='\t', encoding='gb18030', on_bad_lines='skip')
+            # 同样跳过重复表头
+            if len(df) > 0:
+                first_row = df.iloc[0]
+                header_strings = ['代码', '名称', '涨跌幅', '涨幅', '涨跌', '成交量', '成交额', '总金额']
+                header_count = 0
+                for val in first_row:
+                    if str(val) in header_strings:
+                        header_count += 1
+                if header_count >= 2:
+                    df = df.iloc[1:].reset_index(drop=True)
+            # 自动处理列名：去除空格，去除引号
+            df.columns = [str(col).strip().replace("'", "").replace('"', '') for col in df.columns]
+            return df
+        except Exception as e2:
+            print(f"尝试gb18030编码也失败: {e2}")
+            return pd.DataFrame()
+
+def parse_pct(s):
+    # 处理所有可能的类型，完全安全
+    try:
+        # 检查是否是Series类型
+        if hasattr(s, '__len__') and not isinstance(s, (str, bytes)):
+            return 0
+        # 检查空值
+        if pd.isna(s) or s == '--' or s == '' or s is None:
+            return 0
+        # 处理字符串
+        if isinstance(s, str):
+            # 跳过表头字符串
+            if s in ['涨跌幅', '涨幅', '涨跌', '代码', '名称', '所属概念', '成交量', '成交额', '总金额', '市盈(动)', '市净率', '总市值', '上市日期']:
+                return 0
+            s = s.replace('%', '').replace('+', '').strip()
+            if s == '':
+                return 0
+            return float(s)
+        # 处理数字
+        return float(s)
+    except:
+        return 0
+
+def parse_num(s):
+    # 处理所有可能的类型，完全安全
+    try:
+        # 检查是否是Series类型
+        if hasattr(s, '__len__') and not isinstance(s, (str, bytes)):
+            return 0
+        # 检查空值
+        if pd.isna(s) or s == '--' or s == '' or s is None:
+            return 0
+        # 处理字符串
+        if isinstance(s, str):
+            # 跳过表头字符串
+            if s in ['涨跌幅', '涨幅', '涨跌', '代码', '名称', '所属概念', '成交量', '成交额', '总金额', '市盈(动)', '市净率', '总市值', '上市日期']:
+                return 0
+            s = s.replace(',', '').strip()
+            if s == '':
+                return 0
+            return float(s)
+        # 处理数字
+        return float(s)
+    except:
+        return 0
+
+def generate_stock_link(stock_code, stock_name):
+    """生成正确的股票链接 - 支持多种格式"""
+    code_str = str(stock_code).strip()
+    exchange = ''
+    pure_code = ''
+    
+    # 情况1：代码包含前缀 SZ/SH
+    if 'SZ' in code_str.upper():
+        exchange = 'sz'
+        pure_code = code_str.upper().replace('SZ', '').replace('.', '')
+    elif 'SH' in code_str.upper():
+        exchange = 'sh'
+        pure_code = code_str.upper().replace('SH', '').replace('.', '')
+    else:
+        # 情况2：无前缀，根据代码长度和开头判断
+        pure_code = code_str.replace('.', '')
+        if pure_code.startswith('6'):
+            exchange = 'sh'
+        elif pure_code.startswith('0') or pure_code.startswith('3'):
+            exchange = 'sz'
+        else:
+            exchange = 'sz'  # 默认
+    
+    # 确保代码是6位
+    while len(pure_code) < 6 and len(pure_code) > 0:
+        pure_code = '0' + pure_code
+    
+    # 使用东方财富新版格式链接 - 更可靠
+    if exchange == 'sh':
+        url = f"https://quote.eastmoney.com/{exchange}{pure_code}.html"
+    else:
+        url = f"https://quote.eastmoney.com/{exchange}{pure_code}.html"
+    return pure_code, exchange, url
+
+def get_pure_code(stock_code):
+    """获取纯股票代码（不带前缀）"""
+    code_str = str(stock_code).strip()
+    if 'SZ' in code_str.upper():
+        return code_str.upper().replace('SZ', '').replace('.', '')
+    elif 'SH' in code_str.upper():
+        return code_str.upper().replace('SH', '').replace('.', '')
+    else:
+        return code_str.replace('.', '')
+
+def is_st_stock(stock_name):
+    """判断是否是ST股票"""
+    name = str(stock_name)
+    return 'ST' in name or 'st' in name
+
+def is_star_st_stock(stock_name):
+    """判断是否是*ST股票"""
+    name = str(stock_name)
+    return '*ST' in name or '*st' in name
+
+def is_kcb_stock(stock_code):
+    """判断是否是科创板股票（688开头）"""
+    pure_code = get_pure_code(stock_code)
+    return pure_code.startswith('688')
+
+def is_bse_stock(stock_code):
+    """判断是否是北交所股票（920开头）"""
+    pure_code = get_pure_code(stock_code)
+    return pure_code.startswith('920')
+
+def is_cyb_stock(stock_code):
+    """判断是否是创业板股票（300/301开头）"""
+    pure_code = get_pure_code(stock_code)
+    return pure_code.startswith('300') or pure_code.startswith('301')
+
+def is_mainboard_stock(stock_code):
+    """判断是否是主板股票（600/601/603/605/000/001/002/003开头）"""
+    pure_code = get_pure_code(stock_code)
+    return (pure_code.startswith('600') or pure_code.startswith('601') or 
+            pure_code.startswith('603') or pure_code.startswith('605') or
+            pure_code.startswith('000') or pure_code.startswith('001') or
+            pure_code.startswith('002') or pure_code.startswith('003'))
+
+def is_new_stock(list_date, trade_date='20260520'):
+    """判断是否是新股（上市不足1年）"""
+    if pd.isna(list_date):
+        return False
+    try:
+        list_date_str = str(int(list_date))
+        trade_date_str = str(trade_date)
+        if len(list_date_str) != 8 or len(trade_date_str) != 8:
+            return False
+        list_year = int(list_date_str[:4])
+        trade_year = int(trade_date_str[:4])
+        return (trade_year - list_year) < 1
+    except:
+        return False
+
+def safe_is_new_stock_for_risk(x):
+    """安全的新股判断函数，用于风险排查"""
+    if pd.isna(x):
+        return False
+    try:
+        x_str = str(int(x))
+        if len(x_str) != 8:
+            return False
+        list_year = int(x_str[:4])
+        trade_year = int(TRADE_DATE[:4])
+        return (trade_year - list_year) < 1
+    except:
+        return False
+
+def check_stock_risk(stock_name, stock_code, list_date=None):
+    """
+    检查个股风险
+    返回: (风险状态, 风险描述)
+    """
+    risks = []
+    
+    # 退市风险检查
+    if is_st_stock(stock_name) or is_star_st_stock(stock_name):
+        risks.append('🚫 退市风险')
+    
+    # 科创板风险
+    if is_kcb_stock(stock_code):
+        risks.append('⚠️ 科创板')
+    
+    # 次新股风险
+    if list_date is not None and safe_is_new_stock_for_risk(list_date):
+        risks.append('⚠️ 次新股')
+    
+    if len(risks) == 0:
+        return '✅ 安全', '无明显风险'
+    else:
+        return ' '.join(risks), '存在风险，谨慎参与'
+
+def standardize_column_names(df):
+    """标准化列名，将新数据格式映射为原代码可用的列名"""
+    # 列名映射字典
+    column_mapping = {
+        '代码': '代码', '名称': '名称', '所属板块': '所属概念', '概念': '所属概念',
+        '涨跌幅': '涨幅', '涨跌': '涨幅', '成交量': '成交量', '成交额': '总金额',
+        '成交金额': '总金额', '市盈(动)': '市盈(动)', '市净率': '市净率',
+        '总市值': '总市值', '上市日期': '上市日期'
+    }
+    
+    # 创建列名映射
+    rename_dict = {}
+    for old_col in df.columns:
+        for target_name in column_mapping:
+            if target_name in str(old_col):
+                rename_dict[old_col] = column_mapping[target_name]
+                break
+    
+    # 重命名列
+    if rename_dict:
+        df = df.rename(columns=rename_dict)
+    
+    # 确保必要的列存在（补缺失的列）
+    required_cols = ['代码', '名称', '涨幅', '总金额', '所属概念', '市盈(动)', '市净率', '总市值', '上市日期']
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = '--'
+    
+    return df
+
+def is_limit_up(change_pct):
+    """判断是否涨停"""
+    pct = parse_pct(change_pct)
+    return pct >= 9.9
+
+def check_fundamentals(row):
+    """检查个股基本面，返回是否通过校验和校验结果"""
+    issues = []
+    
+    # 检查市盈率
+    pe_ratio = row.get('市盈(动)', '--')
+    if pe_ratio != '--' and pe_ratio is not None:
+        try:
+            pe = float(str(pe_ratio).replace(',', ''))
+            if pe < 0:
+                issues.append('市盈率为负')
+            elif pe > 200:
+                issues.append('市盈率过高')
+        except:
+            pass
+    
+    # 检查市净率
+    pb_ratio = row.get('市净率', '--')
+    if pb_ratio != '--' and pb_ratio is not None:
+        try:
+            pb = float(str(pb_ratio).replace(',', ''))
+            if pb < 0:
+                issues.append('市净率为负')
+            elif pb > 20:
+                issues.append('市净率过高')
+        except:
+            pass
+    
+    # 检查总市值
+    total_cap = row.get('总市值', '--')
+    if total_cap != '--' and total_cap is not None:
+        try:
+            cap = parse_num(total_cap)
+            if cap < 1000000000:  # 小于10亿
+                issues.append('市值较小')
+        except:
+            pass
+    
+    return len(issues) == 0, issues
+
+def filter_valid_stocks(df):
+    """过滤出符合条件的股票（非ST、非科创板、非北交所、非新股、基本面良好）"""
+    # 重置索引避免重复
+    df = df.reset_index(drop=True).copy()
+    
+    # 检查必需的列是否存在
+    required_cols = ['名称', '代码', '上市日期']
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = '--'
+    
+    # 应用基本筛选 - 改用逐行筛选避免pandas类型问题
+    valid_indices = []
+    for idx, row in df.iterrows():
+        name = str(row['名称'])
+        code = str(row['代码'])
+        
+        is_valid = True
+        if is_st_stock(name):
+            is_valid = False
+        if is_star_st_stock(name):
+            is_valid = False
+        if is_kcb_stock(code):
+            is_valid = False
+        if is_bse_stock(code):
+            is_valid = False
+        
+        if is_valid:
+            valid_indices.append(idx)
+    
+    valid_df = df.iloc[valid_indices].reset_index(drop=True).copy()
+    
+    # 处理新股筛选
+    def safe_is_new_stock(x):
+        if x == '--' or pd.isna(x):
+            return False  # 默认不算新股
+        return is_new_stock(x, TRADE_DATE)
+    
+    valid_df['is_new'] = valid_df['上市日期'].apply(safe_is_new_stock)
+    valid_df = valid_df[~valid_df['is_new']].reset_index(drop=True).copy()
+    
+    # 进一步过滤基本面有问题的股票（使用掩码代替收集行）
+    valid_indices = []
+    for idx, row in valid_df.iterrows():
+        is_valid, issues = check_fundamentals(row)
+        if is_valid:
+            valid_indices.append(idx)
+    
+    if valid_indices:
+        return valid_df.iloc[valid_indices].reset_index(drop=True)
+    else:
+        return pd.DataFrame()
+
+def select_leader_stocks(sector_stocks_df):
+    """
+    根据新规则选择龙头股 - 简化版本，避开复杂的pandas问题
+    返回：(leader1, leader2, leader3, middle_stock)
+    """
+    if len(sector_stocks_df) == 0:
+        return None, None, None, None
+    
+    # 先过滤出符合条件的股票
+    valid_stocks = filter_valid_stocks(sector_stocks_df)
+    
+    if len(valid_stocks) == 0:
+        return None, None, None, None
+    
+    # 把DataFrame转换成列表字典，避免复杂的pandas操作
+    stocks_list = []
+    for _, row in valid_stocks.iterrows():
+        stock_dict = {}
+        for col in valid_stocks.columns:
+            val = row[col]
+            # 确保值不是Series类型
+            if hasattr(val, 'item'):
+                try:
+                    val = val.item()
+                except:
+                    pass
+            stock_dict[col] = val
+        stocks_list.append(stock_dict)
+    
+    # 确定涨幅列名
+    pct_col = None
+    possible_cols = ['涨幅', '涨跌幅', '涨跌']
+    for col in possible_cols:
+        if col in valid_stocks.columns:
+            pct_col = col
+            break
+    if pct_col is None:
+        return None, None, None, None
+    
+    # 添加涨跌幅数值
+    for stock in stocks_list:
+        stock['涨跌幅数值'] = parse_pct(stock.get(pct_col, 0))
+    
+    # 按涨幅排序
+    stocks_list.sort(key=lambda x: x['涨跌幅数值'], reverse=True)
+    
+    # 提取主板股票
+    mainboard_stocks = []
+    for stock in stocks_list:
+        code = stock.get('代码', '')
+        try:
+            if is_mainboard_stock(code):
+                mainboard_stocks.append(stock)
+        except:
+            pass
+    
+    # 提取龙头一（优先主板）
+    leader1 = None
+    if len(mainboard_stocks) > 0:
+        leader1 = mainboard_stocks[0]
+    elif len(stocks_list) > 0:
+        leader1 = stocks_list[0]
+    
+    # 提取龙头二（优先主板，且不是龙一）
+    leader2 = None
+    if len(mainboard_stocks) > 1:
+        leader2 = mainboard_stocks[1]
+    elif len(mainboard_stocks) == 1 and len(stocks_list) > 1:
+        # 如果主板只有一只，从其他股票中选
+        leader1_code = str(mainboard_stocks[0].get('代码', ''))
+        for stock in stocks_list:
+            if str(stock.get('代码', '')) != leader1_code:
+                leader2 = stock
+                break
+    elif len(stocks_list) > 1:
+        leader2 = stocks_list[1]
+    
+    # 提取龙头三（必须是创业板）
+    leader3 = None
+    cyb_stocks = []
+    for stock in stocks_list:
+        code = stock.get('代码', '')
+        try:
+            if is_cyb_stock(code):
+                cyb_stocks.append(stock)
+        except:
+            pass
+    if len(cyb_stocks) > 0:
+        leader3 = cyb_stocks[0]
+    elif len(stocks_list) > 2:
+        # 如果没有创业板，就取第三只
+        leader3 = stocks_list[2]
+    
+    # 提取中军股（成交额最大且涨幅为正）
+    middle_stock = None
+    amount_col = None
+    possible_amount_cols = ['总金额', '成交额', '成交金额']
+    for col in possible_amount_cols:
+        if col in valid_stocks.columns:
+            amount_col = col
+            break
+    if amount_col is not None:
+        # 添加金额数值
+        for stock in stocks_list:
+            stock['总金额数值'] = parse_num(stock.get(amount_col, 0))
+        
+        # 过滤涨幅为正的
+        positive_stocks = [s for s in stocks_list if s.get('涨跌幅数值', 0) > 0]
+        if len(positive_stocks) > 0:
+            # 按金额排序
+            positive_stocks.sort(key=lambda x: x.get('总金额数值', 0), reverse=True)
+            middle_stock = positive_stocks[0]
+    
+    return leader1, leader2, leader3, middle_stock
+
+import requests as _req
+
+def _em_index_kline(secid, beg, end):
+    """从东财push2获取指数日K线，返回 (日期列表, close列表, high列表, low列表)"""
+    url = (f'https://push2his.eastmoney.com/api/qt/stock/kline/get'
+           f'?secid={secid}&fields1=f1,f2,f3,f4,f5'
+           f'&fields2=f51,f52,f53,f54,f55,f56,f57'
+           f'&klt=101&fqt=0&beg={beg}&end={end}')
+    r = _req.get(url, timeout=15)
+    d = r.json()
+    klines = d.get('data', {}).get('klines', []) if d.get('data') else []
+    dates, closes, highs, lows = [], [], [], []
+    for k in klines:
+        parts = k.split(',')
+        dates.append(parts[0])
+        closes.append(float(parts[2]))
+        highs.append(float(parts[3]))
+        lows.append(float(parts[4]))
+    return dates, closes, highs, lows
+
+def _calc_ma(values, n):
+    if len(values) >= n:
+        return sum(values[-n:]) / n
+    return 0
+
+def get_index_data(stock_df=None):
+    """从东财push2获取真实指数数据，计算支撑位、压力位、均线等具体数值"""
+    index_config = {
+        'sh':  {'name': '上证指数', 'secid': '1.000001'},
+        'sz':  {'name': '深证成指', 'secid': '0.399001'},
+        'cyb': {'name': '创业板指', 'secid': '0.399006'},
+    }
+    
+    # 初始默认值（网络失败时使用）
+    defaults = {
+        'sh':  [4057.78, '-26.19', '-0.64%'],
+        'sz':  [15661.57, '-43.14', '-0.27%'],
+        'cyb': [4088.88, '-34.11', '-0.83%'],
+    }
+    
+    index_data = {}
+    for key, cfg in index_config.items():
+        index_data[key] = {
+            'name': cfg['name'],
+            'close': defaults[key][0],
+            'change': defaults[key][1],
+            'change_pct': defaults[key][2],
+            'ma5': 0, 'ma10': 0, 'ma20': 0, 'ma60': 0,
+            'support1': 0, 'support2': 0,
+            'resistance1': 0, 'resistance2': 0,
+        }
+    
+    try:
+        print("正在从东方财富获取指数数据...")
+        
+        # 拉取足够多的历史K线（年初至今）用于均线计算
+        beg = '20260101'
+        end = TRADE_DATE
+        
+        for key, cfg in index_config.items():
+            try:
+                dates, closes, highs, lows = _em_index_kline(cfg['secid'], beg, end)
+                if not closes:
+                    print(f"  ❌ {cfg['name']} 无数据")
+                    continue
+                
+                latest_close = closes[-1]
+                prev_close = closes[-2] if len(closes) >= 2 else latest_close
+                chg = latest_close - prev_close
+                chg_pct = (latest_close / prev_close - 1) * 100 if prev_close != 0 else 0
+                
+                index_data[key]['close'] = latest_close
+                index_data[key]['change'] = f'{chg:+.2f}'
+                index_data[key]['change_pct'] = f'{chg_pct:+.2f}%'
+                
+                # 均线
+                index_data[key]['ma5'] = _calc_ma(closes, 5)
+                index_data[key]['ma10'] = _calc_ma(closes, 10)
+                index_data[key]['ma20'] = _calc_ma(closes, 20)
+                index_data[key]['ma60'] = _calc_ma(closes, 60)
+                
+                # 支撑位/压力位：最近10日和20日的高低点
+                if len(highs) >= 10:
+                    index_data[key]['resistance1'] = max(highs[-10:])
+                    index_data[key]['support1'] = min(lows[-10:])
+                else:
+                    index_data[key]['resistance1'] = latest_close * 1.02
+                    index_data[key]['support1'] = latest_close * 0.98
+                
+                if len(highs) >= 20:
+                    index_data[key]['resistance2'] = max(highs[-20:])
+                    index_data[key]['support2'] = min(lows[-20:])
+                else:
+                    index_data[key]['resistance2'] = latest_close * 1.04
+                    index_data[key]['support2'] = latest_close * 0.96
+                
+                print(f"  ✅ {cfg['name']} 收{latest_close:.2f} {chg_pct:+.2f}%")
+                
+            except Exception as e:
+                print(f"  ❌ {cfg['name']} 获取失败: {str(e)}")
+        
+        print("指数数据处理完成！")
+        
+    except Exception as e:
+        print(f"从东方财富获取指数数据失败: {e}，使用备用数据")
+    
+    return index_data
+
+print("正在加载数据...")
+sector_df = read_tsv_file(f'data/{TRADE_DATE}板块数据.xls')
+stock_df = read_tsv_file(f'data/{TRADE_DATE}个股数据.xls')
+money_df = read_tsv_file(f'data/{TRADE_DATE}板块资金.xls')
+high_df = read_tsv_file(f'data/{TRADE_DATE}百日新高.xls')
+
+# 打印列名，方便调试
+print("板块数据列:", sector_df.columns.tolist())
+
+# 加载新的板块个股数据 - 只加载前10个热门板块
+sector_stock_data = {}
+import os
+for idx, row in sector_df.iterrows():
+    # 只处理前10个板块，避免不必要的筛选
+    if idx >= 10:
+        break
+    sector_name = row['板块名称']
+    # 尝试读取该板块的个股数据文件
+    file_path = f'data/{TRADE_DATE}{sector_name}.xls'
+    if os.path.exists(file_path):
+        sector_stock_df = read_tsv_file(file_path)
+        # 标准化列名
+        sector_stock_df = standardize_column_names(sector_stock_df)
+        # 确保所属概念列包含板块名称
+        sector_stock_df['所属概念'] = sector_name
+        sector_stock_data[sector_name] = sector_stock_df
+        print(f"  加载板块数据: {sector_name} ({len(sector_stock_df)}只)")
+    else:
+        # 如果没有单独文件，就从个股数据中筛选
+        sector_stocks = []
+        for _, stock in stock_df.iterrows():
+            concepts_str = str(stock.get('所属概念', ''))
+            concepts_str = concepts_str.replace('【', '').replace('】', '')
+            concepts = concepts_str.split(';')
+            if sector_name in concepts:
+                sector_stocks.append(stock)
+        if sector_stocks:
+            sector_stock_data[sector_name] = pd.DataFrame(sector_stocks)
+            print(f"  从个股数据筛选: {sector_name} ({len(sector_stocks)}只)")
+
+print("正在分析数据...")
+
+# 处理板块数据
+sector_df['涨跌幅数值'] = sector_df['涨幅'].apply(parse_pct)
+sector_df_sorted = sector_df.sort_values('涨跌幅数值', ascending=False)
+
+# 处理个股数据
+stock_df['涨跌幅数值'] = stock_df['涨幅'].apply(parse_pct)
+
+# 如果个股数据缺少全市场统计列（如只有涨停板数据），使用前一交易日数据做全市场统计
+if '总金额' not in stock_df.columns:
+    print("⚠️ 个股数据缺少全市场列，使用前一交易日全市场数据做统计")
+    # 取最近一个交易日
+    prev_date = str(int(TRADE_DATE) - 1)
+    # 跳过周末（简单处理：退到周五）
+    from datetime import datetime as dt
+    d = dt.strptime(prev_date, '%Y%m%d')
+    while d.weekday() >= 5:
+        d = dt.fromtimestamp(d.timestamp() - 86400)
+        prev_date = d.strftime('%Y%m%d')
+    fallback_stock = read_tsv_file(f'data/{prev_date}个股数据.xls')
+    if '涨幅' in fallback_stock.columns and '总金额' in fallback_stock.columns:
+        market_stock = fallback_stock
+        print(f"  使用 {prev_date} 全市场数据 ({len(market_stock)}只)")
+    else:
+        market_stock = stock_df
+else:
+    market_stock = stock_df
+
+market_stock['涨跌幅数值'] = market_stock['涨幅'].apply(parse_pct)
+market_stock['总金额数值'] = market_stock['总金额'].apply(parse_num)
+
+# 计算市场统计
+up_count = len(market_stock[market_stock['涨跌幅数值'] > 0])
+down_count = len(market_stock[market_stock['涨跌幅数值'] < 0])
+limit_up_count = len(market_stock[market_stock['涨跌幅数值'] >= 9.9])
+limit_down_count = len(market_stock[market_stock['涨跌幅数值'] <= -9.9])
+total_amount = market_stock['总金额数值'].sum()
+
+# 定义股票筛选函数
+def clean_code(stock_code):
+    code_str = str(stock_code)
+    # 移除开头的 SH 或 SZ 前缀
+    if code_str.startswith('SH') or code_str.startswith('SZ'):
+        code_str = code_str[2:]
+    return code_str
+
+def is_688_stock(stock_code):
+    code_str = clean_code(stock_code)
+    return code_str.startswith('688')
+
+def is_main_board(stock_code):
+    # 主板：60、00开头，排除688、300
+    code_str = clean_code(stock_code)
+    if is_688_stock(code_str):
+        return False
+    return code_str.startswith('60') or code_str.startswith('00')
+
+def is_chuang_ye_ban(stock_code):
+    # 创业板：300开头，排除688
+    code_str = clean_code(stock_code)
+    if is_688_stock(code_str):
+        return False
+    return code_str.startswith('300')
+
+# 板块涨幅TOP5
+top5_sectors = sector_df_sorted.head(5)
+
+# 主力资金净流入TOP5 - 使用主力金额排序
+if '主力净量' in stock_df.columns:
+    stock_df['主力金额数值'] = pd.to_numeric(stock_df['主力净量'], errors='coerce').fillna(0)
+else:
+    stock_df['主力金额数值'] = 0
+stock_df_sorted_by_money = stock_df.sort_values('主力金额数值', ascending=False)
+top5_money_stocks = stock_df_sorted_by_money.head(5)
+
+# 百日新高分析 - 添加空检查
+high_stocks = []
+top3_concepts = []
+if '涨幅' in high_df.columns and len(high_df) > 0:
+    high_df['涨跌幅数值'] = high_df['涨幅'].apply(parse_pct)
+    
+    high_concepts = {}
+    for _, row in high_df.iterrows():
+        concepts = str(row.get('所属概念', '')).split(';')
+        for concept in concepts:
+            if concept and concept != '--':
+                if concept not in high_concepts:
+                    high_concepts[concept] = []
+                high_concepts[concept].append(row)
+    
+    # 按数量排序概念板块
+    sorted_concepts = sorted(high_concepts.items(), key=lambda x: len(x[1]), reverse=True)
+    top3_concepts = sorted_concepts[:3]
+    
+    # 为每个概念板块筛选4只主板+1只创业板的股票
+    processed_top3_concepts = []
+    for concept_name, original_stocks in top3_concepts:
+        # 更安全地访问列，先确定代码列的名称
+        def safe_get_code(s):
+            try:
+                if '代码' in s.index:
+                    return str(s['代码'])
+                elif '代码' in dir(s):
+                    return str(getattr(s, '代码'))
+                else:
+                    return ''
+            except:
+                return ''
+        
+        def safe_get_change(s):
+            try:
+                if '涨幅' in s.index:
+                    return s['涨幅']
+                elif '涨跌幅' in s.index:
+                    return s['涨跌幅']
+                else:
+                    return 0
+            except:
+                return 0
+        
+        main_board_stocks = []
+        chuang_ye_ban_stocks = []
+        other_stocks = []
+        
+        for s in original_stocks:
+            code = safe_get_code(s)
+            try:
+                if is_main_board(code):
+                    main_board_stocks.append(s)
+                elif is_chuang_ye_ban(code):
+                    chuang_ye_ban_stocks.append(s)
+                elif not is_688_stock(code):
+                    other_stocks.append(s)
+            except:
+                pass
+        
+        main_board_stocks.sort(key=lambda x: parse_pct(safe_get_change(x)), reverse=True)
+        chuang_ye_ban_stocks.sort(key=lambda x: parse_pct(safe_get_change(x)), reverse=True)
+        other_stocks.sort(key=lambda x: parse_pct(safe_get_change(x)), reverse=True)
+        
+        selected_stocks = []
+        selected_stocks.extend(main_board_stocks[:4])
+        selected_stocks.extend(chuang_ye_ban_stocks[:1])
+        
+        if len(selected_stocks) < 5:
+            selected_stocks.extend(other_stocks[:5 - len(selected_stocks)])
+        
+        processed_top3_concepts.append((concept_name, selected_stocks[:5], len(original_stocks)))
+    
+    top3_concepts = processed_top3_concepts
+
+
+
+# 获取指数数据
+index_data = get_index_data(stock_df)
+
+# 分析市场强弱
+market_strength = "中性"
+if up_count / (up_count + down_count) > 0.6:
+    market_strength = "强势"
+elif up_count / (up_count + down_count) < 0.4:
+    market_strength = "弱势"
+
+print("正在生成HTML报告...")
+
+html_content = f'''<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{DISPLAY_DATE}A股详细复盘报告</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #e0e0e0;
+            line-height: 1.6;
+            min-height: 100vh;
+        }}
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        .header {{
+            text-align: center;
+            padding: 30px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }}
+        .header h1 {{
+            color: #00d4ff;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }}
+        .header p {{
+            color: #a0a0a0;
+            font-size: 1.1em;
+        }}
+        .section {{
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }}
+        .section-title {{
+            color: #ffd700;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+        }}
+        .stat-cards {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }}
+        .stat-card {{
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }}
+        .stat-card .label {{
+            color: #a0a0a0;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }}
+        .stat-card .value {{
+            color: #00d4ff;
+            font-size: 2em;
+            font-weight: bold;
+        }}
+        .stat-card .value.up {{
+            color: #ff4757;
+        }}
+        .stat-card .value.down {{
+            color: #2ed573;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }}
+        th {{
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }}
+        td {{
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }}
+        tr:hover {{
+            background: rgba(255, 255, 255, 0.05);
+        }}
+        .up {{
+            color: #ff4757;
+        }}
+        .down {{
+            color: #2ed573;
+        }}
+        .analysis-text {{
+            background: rgba(0, 212, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            line-height: 1.8;
+        }}
+        .sector-cards {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }}
+        .sector-card {{
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+        }}
+        .sector-card h3 {{
+            color: #ffd700;
+            margin-bottom: 15px;
+        }}
+        .stock-item {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }}
+        .stock-item:last-child {{
+            border-bottom: none;
+        }}
+        .watchlist-btn {{
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #00d4ff, #0064ff);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+        }}
+        .watchlist-btn:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
+        }}
+        .watchlist-panel {{
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background: #1a1a2e;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            width: 350px;
+            max-height: 500px;
+            overflow-y: auto;
+            z-index: 999;
+            display: none;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }}
+        .watchlist-panel.show {{
+            display: block;
+        }}
+        .watchlist-panel h3 {{
+            color: #ffd700;
+            margin-bottom: 15px;
+        }}
+        .watchlist-item {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }}
+        .watchlist-item a {{
+            color: #00d4ff;
+            text-decoration: none;
+        }}
+        .watchlist-item a:hover {{
+            text-decoration: underline;
+        }}
+        .remove-btn {{
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }}
+        .add-btn {{
+            background: #2ed573;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }}
+        .add-btn:disabled {{
+            background: #666;
+            cursor: not-allowed;
+        }}
+        .export-btn {{
+            background: #ffd700;
+            color: #1a1a2e;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }}
+        .toast {{
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 212, 255, 0.9);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            z-index: 2000;
+            display: none;
+        }}
+        .toast.show {{
+            display: block;
+        }}
+        .stock-link {{
+            color: #00d4ff;
+            text-decoration: none;
+            cursor: pointer;
+        }}
+        .stock-link:hover {{
+            text-decoration: underline;
+        }}
+        /* ===== 手机适配 ===== */
+        @media (max-width: 768px) {{
+            .container {{ padding: 10px; }}
+            .header {{ padding: 20px 15px; margin-bottom: 15px; }}
+            .header h1 {{ font-size: 1.3em; }}
+            .header p {{ font-size: 0.85em; }}
+            .section {{ padding: 15px; margin-bottom: 15px; border-radius: 10px; }}
+            .section-title {{ font-size: 1.1em; margin-bottom: 12px; }}
+            .stat-cards {{ grid-template-columns: repeat(2, 1fr); gap: 10px; }}
+            .stat-card {{ padding: 12px; }}
+            .stat-card .value {{ font-size: 1.3em; }}
+            .stat-card .label {{ font-size: 0.75em; }}
+            table {{ font-size: 0.75em; display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }}
+            th, td {{ padding: 8px 6px; }}
+            .chart-container {{ max-width: 100%; overflow-x: auto; }}
+            .sector-leaders {{ grid-template-columns: 1fr !important; }}
+            .watchlist-btn {{ font-size: 11px; padding: 6px 12px; }}
+        }}
+        @media (max-width: 768px) {{
+            .container {{ padding: 10px; }}
+            .header {{ padding: 15px 10px; }}
+            .header h1 {{ font-size: 1.3em; }}
+            .section {{ padding: 15px; margin-bottom: 15px; }}
+            .section-title {{ font-size: 1.1em; }}
+            .stat-cards {{ grid-template-columns: repeat(2, 1fr); gap: 10px; }}
+            .stat-card {{ padding: 12px; }}
+            .stat-card .value {{ font-size: 1.4em; }}
+            .sector-cards {{ grid-template-columns: 1fr; }}
+            table {{ font-size: 0.75em; }}
+            th, td {{ padding: 6px 4px; }}
+            .watchlist-btn {{ top: 5px; right: 5px; padding: 6px 10px; font-size: 0.75em; }}
+            .risk-footer {{ padding: 15px 10px; font-size: 0.7em; }}
+            .login-box {{ padding: 30px 20px; }}
+            .login-box h1 {{ font-size: 20px; }}
+            .login-box .sub {{ font-size: 12px; }}
+        }}
+        @media (max-width: 400px) {{
+            .stat-cards {{ grid-template-columns: 1fr; }}
+            .header h1 {{ font-size: 1.1em; }}
+            .section-title {{ font-size: 1em; }}
+        }}
+        /* 会员登录门控 —— 与投研登录页完全一致 */
+        .member-overlay {{
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg); z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+            background-image: linear-gradient(rgba(30,41,59,.2) 1px,transparent 1px),linear-gradient(90deg,rgba(30,41,59,.2) 1px,transparent 1px);
+            background-size: 50px 50px;
+        }}
+        .member-overlay.hidden {{ display: none; }}
+        :root {{
+            --bg: #050507; --card: #101010; --border: #3d3a39;
+            --green: #00d992; --green-glow: rgba(0,217,146,.3);
+            --text: #f2f2f2; --text2: #b8b3b0; --text3: #8b949e;
+        }}
+        .login-box {{
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 40px; width: 380px; max-width: 90vw;
+            box-shadow: 0 0 40px rgba(0,0,0,.5);
+        }}
+        .login-box h1 {{ font-size: 24px; font-weight: 400; text-align: center; margin-bottom: 4px; color: var(--text); }}
+        .login-box h1 span {{ color: var(--green); }}
+        .login-box .sub {{ text-align: center; font-size: 13px; color: var(--text3); margin-bottom: 32px; }}
+        .login-box .input-group {{ margin-bottom: 20px; }}
+        .login-box .input-group label {{ display: block; font-size: 12px; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }}
+        .login-box .input-group input {{
+            width: 100%; padding: 12px 16px; background: var(--bg);
+            border: 1px solid var(--border); border-radius: 6px;
+            color: var(--text); font-size: 14px; font-family: inherit;
+            outline: none; transition: border-color .3s;
+        }}
+        .login-box .input-group input:focus {{ border-color: var(--green); }}
+        .login-box .btn {{
+            width: 100%; padding: 12px; background: var(--green);
+            border: none; border-radius: 6px; color: var(--bg);
+            font-size: 15px; font-weight: 600; cursor: pointer;
+            transition: all .3s; font-family: inherit;
+        }}
+        .login-box .btn:hover {{ box-shadow: 0 0 20px var(--green-glow); }}
+        .login-box .error {{
+            background: rgba(251,113,133,.1); border: 1px solid rgba(251,113,133,.3);
+            color: #fb7185; padding: 10px; border-radius: 6px;
+            font-size: 13px; text-align: center; margin-bottom: 20px; display: none;
+        }}
+        .login-box .links {{ text-align: center; margin-top: 20px; font-size: 13px; }}
+        .login-box .links a {{ color: var(--green); text-decoration: none; cursor: pointer; }}
+        .login-box .links a:hover {{ text-decoration: underline; }}
+        .blur-content {{ filter: blur(8px); pointer-events: none; user-select: none; }}
+        /* 风险揭示 */
+        .risk-footer {{
+            background: rgba(255,0,0,0.08); border: 1px solid rgba(255,0,0,0.25);
+            border-radius: 12px; padding: 25px; margin: 30px 0 20px;
+        }}
+        .risk-footer h3 {{ color: #ff4757; font-size: 1.1em; margin-bottom: 12px; }}
+        .risk-footer p {{ color: #a0a0a0; font-size: 0.8em; line-height: 1.8; margin-bottom: 6px; }}
+    </style>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-GEF5QPMJR6"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){{dataLayer.push(arguments);}}
+      gtag('js', new Date());
+      if (!localStorage.getItem('review_member') && localStorage.getItem('review_role') !== 'admin') {{
+        gtag('config', 'G-GEF5QPMJR6');
+      }}
+    </script>
+</head>
+<body>
+    <!-- 会员登录门控 -->
+    <div class="member-overlay" id="memberGate">
+        <div class="login-box">
+            <h1>会员<span>登录</span></h1>
+            <p class="sub">输入邮箱免费查看每日深度复盘</p>
+            <div class="error" id="loginError"></div>
+            <div class="input-group">
+                <label>邮箱</label>
+                <input type="email" id="loginEmail" placeholder="请输入邮箱地址" autocomplete="email">
+            </div>
+            <div class="input-group">
+                <label>密码</label>
+                <input type="password" id="loginPassword" placeholder="请输入密码（6位以上）" autocomplete="current-password">
+            </div>
+            <button class="btn" onclick="handleLogin()">登 录</button>
+            <div class="links">
+                <a onclick="toggleMode()" id="modeToggle">注册新账号</a>
+            </div>
+        </div>
+    </div>
+    <div id="mainContent" class="blur-content">
+    <button class="watchlist-btn" onclick="toggleWatchlist()">⭐ 自选股 ({TRADE_DATE})</button>
+    
+    <div class="watchlist-panel" id="watchlistPanel">
+        <h3>📋 自选股列表</h3>
+        <div id="watchlistContent"></div>
+        <button class="export-btn" onclick="exportWatchlist()">导出到TXT</button>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1>📊 {DISPLAY_DATE} A股详细复盘报告</h1>
+            <p>数据来源：同花顺 | tushare | 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        </div>
+
+        <!-- 第一部分：指数/概念分析 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 20px;border-radius:8px;font-size:1.3em;font-weight:bold;">01</span>
+                指数/概念分析
+            </h2>
+            
+            <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:25px;margin-top:20px;">
+                <!-- 左侧：指数与涨跌概览 -->
+                <div>
+                    <h3 style="color:#ffd700;margin-bottom:15px;font-size:1.1em;">📊 指数表现</h3>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:20px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                            <span style="font-weight:bold;">上证指数</span>
+                            <div style="text-align:right;">
+                                <div style="font-size:1.3em;font-weight:bold;">{index_data['sh']['close']}</div>
+                                <div class="{index_data['sh']['change_pct'].startswith('-') and 'down' or 'up'}" style="font-weight:bold;">{index_data['sh']['change_pct']}</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                            <span style="font-weight:bold;">深证成指</span>
+                            <div style="text-align:right;">
+                                <div style="font-size:1.3em;font-weight:bold;">{index_data['sz']['close']}</div>
+                                <div class="{index_data['sz']['change_pct'].startswith('-') and 'down' or 'up'}" style="font-weight:bold;">{index_data['sz']['change_pct']}</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;">
+                            <span style="font-weight:bold;">创业板指</span>
+                            <div style="text-align:right;">
+                                <div style="font-size:1.3em;font-weight:bold;">{index_data['cyb']['close']}</div>
+                                <div class="{index_data['cyb']['change_pct'].startswith('-') and 'down' or 'up'}" style="font-weight:bold;">{index_data['cyb']['change_pct']}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 涨跌饼图示意 -->
+                    <h3 style="color:#ffd700;margin:20px 0 15px;font-size:1.1em;">📈 个股涨跌图</h3>
+                    <div style="display:flex;gap:20px;align-items:center;">
+                        <div style="flex:1;">
+                            <div style="width:180px;height:180px;border-radius:50%;background:conic-gradient(#ff4757 0deg {up_count/(up_count+down_count)*360}deg,#2ed573 {up_count/(up_count+down_count)*360}deg 360deg);display:flex;align-items:center;justify-content:center;position:relative;">
+                                <div style="width:100px;height:100px;border-radius:50%;background:#1a1a2e;display:flex;align-items:center;justify-content:center;flex-direction:column;">
+                                    <div style="font-weight:bold;font-size:0.9em;">沪深A股</div>
+                                    <div style="font-size:0.8em;color:#a0a0a0;">{up_count+down_count}只</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="flex:1;">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                                <div style="width:20px;height:20px;background:#ff4757;border-radius:3px;"></div>
+                                <span>上涨 {up_count} ({up_count*100/(up_count+down_count):.0f}%)</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                                <div style="width:20px;height:20px;background:#2ed573;border-radius:3px;"></div>
+                                <span>下跌 {down_count} ({down_count*100/(up_count+down_count):.0f}%)</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                                <div style="width:20px;height:20px;background:#ffd700;border-radius:3px;"></div>
+                                <span>涨停 {limit_up_count}</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <div style="width:20px;height:20px;background:#a0a0a0;border-radius:3px;"></div>
+                                <span>跌停 {limit_down_count}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 右侧：概念板块与分析 -->
+                <div>
+                    <h3 style="color:#ffd700;margin-bottom:15px;font-size:1.1em;">🔥 涨幅前三的概念</h3>
+                    <table style="width:100%;background:rgba(255,255,255,0.05);border-radius:8px;overflow:hidden;">
+'''
+
+# 添加领涨概念
+for idx, row in enumerate(sector_df_sorted.head(3).itertuples(), 1):
+    highlight = 'background:rgba(0,212,255,0.2);' if idx == 1 else ''
+    html_content += f'''
+                        <tr style="{highlight}">
+                            <td style="padding:12px;font-weight:bold;">{row.板块名称}</td>
+                            <td style="padding:12px;text-align:right;" class="up">{row.涨幅}</td>
+                        </tr>
+'''
+
+html_content += f'''
+                    </table>
+                    
+                    <!-- 市场分析 -->
+                    <h3 style="color:#ffd700;margin:20px 0 15px;font-size:1.1em;">📝 市场分析</h3>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:20px;line-height:1.8;">
+'''
+
+# 动态生成分析内容
+if market_strength == '强势':
+    analysis_text = f'市场整体表现强势，上涨{up_count}家，下跌{down_count}家。{", ".join([row.板块名称 for _, row in sector_df_sorted.head(3).iterrows()])}等板块领涨市场，板块效应明显。'
+elif market_strength == '弱势':
+    analysis_text = f'市场整体偏弱，上涨{up_count}家，下跌{down_count}家。建议保持谨慎，控制仓位，等待更明确的机会。'
+else:
+    analysis_text = f'市场整体震荡，上涨{up_count}家，下跌{down_count}家。结构性机会依然存在，建议精选个股，把握节奏。'
+
+html_content += f'''
+                        <p>{analysis_text}</p>
+                        <p style="margin-top:10px;"><strong>成交额：</strong>今日两市总成交额{total_amount/100000000:.1f}亿元</p>
+'''
+
+if market_strength == '弱势':
+    html_content += f'''
+                        <p style="margin-top:10px;color:#ff4757;"><strong>⚠️ 交易提示：</strong>大盘弱势，不追涨；跌停家数大增时不开新仓。</p>
+'''
+
+html_content += '''
+                    </div>
+                </div>
+            </div>
+        </div>
+'''
+
+html_content += '''
+
+        <!-- 02：板块涨跌分布 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">02</span>
+                板块涨跌分布
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>排名</th>
+                        <th>板块名称</th>
+                        <th>涨幅</th>
+                        <th>涨家数</th>
+                        <th>跌家数</th>
+                        <th>领涨股</th>
+                    </tr>
+                </thead>
+                <tbody>
+'''
+
+# 添加板块涨幅TOP5
+for idx, row in enumerate(sector_df_sorted.head(5).itertuples(), 1):
+    # 从个股数据中查找领涨股的代码
+    leading_code = ''
+    leading_name = getattr(row, '领涨股', '--')
+    if leading_name != '--' and not stock_df.empty:
+        # 查找匹配的股票
+        match_df = stock_df[stock_df['名称'] == leading_name]
+        if len(match_df) > 0:
+            leading_code = match_df.iloc[0]['代码']
+    
+    # 生成链接
+    if leading_code and leading_name != '--':
+        code, exchange, url = generate_stock_link(leading_code, leading_name)
+        leading_display = f'<a class="stock-link" href="{url}" target="_blank">{leading_name}</a>'
+    else:
+        leading_display = leading_name
+    
+    html_content += f'''
+                    <tr>
+                        <td>{idx}</td>
+                        <td>{row.板块名称}</td>
+                        <td class="{ 'up' if row.涨跌幅数值 > 0 else 'down' if row.涨跌幅数值 < 0 else '' }">{row.涨幅}</td>
+                        <td>{row.涨家数}</td>
+                        <td>{row.跌家数}</td>
+                        <td>{leading_display}</td>
+                    </tr>
+'''
+
+html_content += '''
+                </tbody>
+            </table>
+            <div class="analysis-text">
+                <p><strong>板块分析：</strong>今日领涨板块表现突出，市场热点集中在上述板块。板块轮动特征明显，建议关注持续性较强的板块。</p>
+                <p><strong>💡 交易提示：</strong>根据您的交易体系，板块强时买最强；分歧只切核心，不切跟风。</p>
+            </div>
+        </div>
+
+        <!-- 03：主力资金净流入TOP5 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">03</span>
+                主力资金净流入TOP5
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>排名</th>
+                        <th>股票名称</th>
+                        <th>代码</th>
+                        <th>涨幅</th>
+                        <th>主力净量</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+'''
+
+for idx, row in enumerate(top5_money_stocks.head(5).itertuples(), 1):
+    code, exchange, url = generate_stock_link(row.代码, row.名称)
+    html_content += f'''
+                    <tr>
+                        <td>{idx}</td>
+                        <td><a class="stock-link" href="{url}" target="_blank">{row.名称}</a></td>
+                        <td>{code}</td>
+                        <td class="{ 'up' if parse_pct(row.涨幅) > 0 else 'down' if parse_pct(row.涨幅) < 0 else '' }">{row.涨幅}</td>
+                        <td>{getattr(row, '主力净量', '--')}</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('{code}', '{row.名称}', '{exchange}')">+自选</button></td>
+                    </tr>
+'''
+
+html_content += '''
+                </tbody>
+            </table>
+            <div class="analysis-text">
+                <p><strong>资金流向分析：</strong>今日主力资金重点关注上述个股，建议结合技术面和基本面综合分析。</p>
+            </div>
+        </div>
+
+        <!-- 04：百日新高概念板块分析 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">04</span>
+                百日新高概念板块分析
+            </h2>
+            <div class="sector-cards">
+'''
+
+if top3_concepts:
+    for concept_name, stocks, original_count in top3_concepts:
+        html_content += f'''
+                <div class="sector-card">
+                    <h3>🏆 {concept_name} (共{original_count}只)</h3>
+'''
+        for stock in stocks[:5]:
+            # 安全获取代码和名称
+            def safe_get(s, col_name, default=''):
+                try:
+                    if col_name in s.index:
+                        return str(s[col_name])
+                    elif col_name in dir(s):
+                        return str(getattr(s, col_name))
+                    else:
+                        return default
+                except:
+                    return default
+            
+            stock_code = safe_get(stock, '代码', '')
+            stock_name = safe_get(stock, '名称', '')
+            
+            code, exchange, url = generate_stock_link(stock_code, stock_name)
+            
+            # 安全获取涨幅
+            change_str = '--'
+            try:
+                change_val = safe_get(stock, '涨幅', '')
+                if not change_val:
+                    change_val = safe_get(stock, '涨跌幅', '')
+                if change_val:
+                    change_str = str(change_val)
+                    if 'Name:' in change_str or 'dtype:' in change_str:
+                        import re
+                        match = re.search(r'([-+]?\d+\.?\d*%?)', change_str)
+                        if match:
+                            change_str = match.group(1)
+            except:
+                pass
+            
+            html_content += f'''
+                    <div class="stock-item">
+                        <span><a class="stock-link" href="{url}" target="_blank">{stock_name} ({code})</a></span>
+                        <span class="{ 'up' if parse_pct(change_str) > 0 else 'down' }">{change_str}</span>
+                        <button class="add-btn" onclick="addToWatchlist('{code}', '{stock_name}', '{exchange}')">+自选</button>
+                    </div>
+'''
+        html_content += '''
+                </div>
+'''
+else:
+    html_content += '''
+                <div class="sector-card" style="text-align: center; padding: 40px;">
+                    <h3>暂无百日新高数据</h3>
+                    <p style="margin-top: 15px; color: #a0a0a0;">今日暂未找到创百日新高的个股数据</p>
+                </div>
+'''
+
+html_content += '''
+            </div>
+            <div class="analysis-text">
+                <p><strong>百日新高分析：</strong>今日创百日新高的个股主要集中在上述概念板块。创新高个股往往代表市场资金的认可度，可作为后续观察的重点。</p>
+            </div>
+        </div>
+
+        <!-- 05：三大指数技术面 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">05</span>
+                三大指数技术面
+            </h2>
+            <div class="analysis-text">
+                <h3 style="color:#00d4ff;margin-top:15px;">上证指数分析</h3>
+                <p><strong>收盘价：</strong>''' + f'{index_data["sh"]["close"]:.2f}' + ''' (''' + f'{index_data["sh"]["change_pct"]}' + ''')</p>
+                <p>• 支撑位分析：第一支撑位 ''' + f'{index_data["sh"]["support1"]:.2f}' + '''，第二支撑位 ''' + f'{index_data["sh"]["support2"]:.2f}' + '''</p>
+                <p>• 压力位分析：第一压力位 ''' + f'{index_data["sh"]["resistance1"]:.2f}' + '''，第二压力位 ''' + f'{index_data["sh"]["resistance2"]:.2f}' + '''</p>
+                <p>• 均线系统：MA5 ''' + f'{index_data["sh"]["ma5"]:.2f}' + '''，MA10 ''' + f'{index_data["sh"]["ma10"]:.2f}' + '''，MA20 ''' + f'{index_data["sh"]["ma20"]:.2f}' + '''，MA60 ''' + f'{index_data["sh"]["ma60"]:.2f}' + '''</p>
+                <h3 style="color:#00d4ff;margin-top:15px;">深证成指分析</h3>
+                <p><strong>收盘价：</strong>''' + f'{index_data["sz"]["close"]:.2f}' + ''' (''' + f'{index_data["sz"]["change_pct"]}' + ''')</p>
+                <p>• 支撑位分析：第一支撑位 ''' + f'{index_data["sz"]["support1"]:.2f}' + '''，第二支撑位 ''' + f'{index_data["sz"]["support2"]:.2f}' + '''</p>
+                <p>• 压力位分析：第一压力位 ''' + f'{index_data["sz"]["resistance1"]:.2f}' + '''，第二压力位 ''' + f'{index_data["sz"]["resistance2"]:.2f}' + '''</p>
+                <p>• 均线系统：MA5 ''' + f'{index_data["sz"]["ma5"]:.2f}' + '''，MA10 ''' + f'{index_data["sz"]["ma10"]:.2f}' + '''，MA20 ''' + f'{index_data["sz"]["ma20"]:.2f}' + '''，MA60 ''' + f'{index_data["sz"]["ma60"]:.2f}' + '''</p>
+                <h3 style="color:#00d4ff;margin-top:15px;">创业板指分析</h3>
+                <p><strong>收盘价：</strong>''' + f'{index_data["cyb"]["close"]:.2f}' + ''' (''' + f'{index_data["cyb"]["change_pct"]}' + ''')</p>
+                <p>• 支撑位分析：第一支撑位 ''' + f'{index_data["cyb"]["support1"]:.2f}' + '''，第二支撑位 ''' + f'{index_data["cyb"]["support2"]:.2f}' + '''</p>
+                <p>• 压力位分析：第一压力位 ''' + f'{index_data["cyb"]["resistance1"]:.2f}' + '''，第二压力位 ''' + f'{index_data["cyb"]["resistance2"]:.2f}' + '''</p>
+                <p>• 均线系统：MA5 ''' + f'{index_data["cyb"]["ma5"]:.2f}' + '''，MA10 ''' + f'{index_data["cyb"]["ma10"]:.2f}' + '''，MA20 ''' + f'{index_data["cyb"]["ma20"]:.2f}' + '''，MA60 ''' + f'{index_data["cyb"]["ma60"]:.2f}' + '''</p>
+                <h3 style="color:#ffd700;margin-top:15px;">💡 市场情绪分析</h3>
+                <p>• <strong>大盘强弱：</strong>涨跌比''' + f'{up_count/down_count:.2f}' + '''，今日市场''' + f'{market_strength}' + '''</p>
+                <p>• <strong>交易提示：</strong>板块强时买最强，分歧只切核心，不切跟风</p>
+            </div>
+        </div>
+
+        <!-- 06：强势板块龙头股 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">06</span>
+                强势板块龙头股
+            </h2>
+            
+            <style>
+                .sector-tabs {
+                    display: flex;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                    flex-wrap: wrap;
+                }
+                .sector-tab {
+                    padding: 12px 24px;
+                    background: rgba(255,255,255,0.05);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    border-radius: 8px;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    font-weight: 500;
+                }
+                .sector-tab:hover {
+                    background: rgba(255,255,255,0.1);
+                    border-color: rgba(255,215,0,0.3);
+                }
+                .sector-tab.active {
+                    background: rgba(255,215,0,0.15);
+                    border-color: rgba(255,215,0,0.5);
+                    color: #ffd700;
+                }
+                .sector-stock-panel {
+                    background: rgba(255,255,255,0.03);
+                    border-radius: 12px;
+                    padding: 20px;
+                    border: 1px solid rgba(255,255,255,0.08);
+                }
+                .sector-panel-title {
+                    font-size: 18px;
+                    font-weight: 600;
+                    margin-bottom: 15px;
+                    color: #00d4ff;
+                }
+                .stock-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                    gap: 12px;
+                }
+                .stock-card {
+                    background: rgba(255,255,255,0.03);
+                    padding: 15px;
+                    border-radius: 8px;
+                    border: 1px solid rgba(255,255,255,0.08);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                }
+                .stock-card-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .stock-name {
+                    font-weight: 600;
+                    font-size: 16px;
+                }
+                .stock-change {
+                    font-weight: 600;
+                    font-size: 15px;
+                }
+                .stock-card-footer {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .leader-card {
+                    border: 2px solid rgba(255, 215, 0, 0.5);
+                    background: rgba(255, 215, 0, 0.05);
+                }
+                .middle-card {
+                    border: 2px solid rgba(0, 212, 255, 0.5);
+                    background: rgba(0, 212, 255, 0.05);
+                }
+            </style>
+            
+            <!-- 板块标签 -->
+            <div class="sector-tabs" id="sectorTabs">
+'''
+
+# 收集所有板块数据
+sector_data = []
+for idx, (_, row) in enumerate(sector_df_sorted.head(4).iterrows(), 1):
+    sector_name = row['板块名称']
+    # 使用新的板块个股数据
+    sector_stocks_df = sector_stock_data.get(sector_name, pd.DataFrame())
+    
+    if len(sector_stocks_df) == 0:
+        # 如果没有找到数据，就从个股数据中筛选
+        sector_stocks = []
+        for _, stock in stock_df.iterrows():
+            concepts_str = str(stock.get('所属概念', ''))
+            concepts_str = concepts_str.replace('【', '').replace('】', '')
+            concepts = concepts_str.split(';')
+            if sector_name in concepts:
+                sector_stocks.append(stock)
+        sector_stocks_df = pd.DataFrame(sector_stocks)
+    
+    # 使用新的龙头股选择逻辑
+    leader1, leader2, leader3, middle_stock = select_leader_stocks(sector_stocks_df)
+    
+    # 获取过滤后的有效股票，用于添加其他成分股
+    valid_stocks = filter_valid_stocks(sector_stocks_df)
+    
+    # 收集所有龙头股和其他成分股
+    display_stocks = []
+    if leader1 is not None:
+        display_stocks.append(('👑 龙头', leader1))
+    if leader2 is not None:
+        display_stocks.append(('🐲 龙二', leader2))
+    if leader3 is not None:
+        display_stocks.append(('🔥 龙三', leader3))
+    if middle_stock is not None:
+        display_stocks.append(('🐎 中军', middle_stock))
+    
+    # 添加其他成分股（最多8只），从过滤后的有效股票中筛选
+    if len(valid_stocks) > 0:
+        # 先重置索引，避免重复标签
+        valid_stocks = valid_stocks.reset_index(drop=True)
+        
+        # 使用安全的方式添加涨跌幅数值
+        pct_values = []
+        for idx_row, row_row in valid_stocks.iterrows():
+            pct_values.append(parse_pct(row_row.get('涨幅', 0)))
+        valid_stocks['涨跌幅数值'] = pct_values
+        
+        all_sorted = valid_stocks.sort_values('涨跌幅数值', ascending=False)
+        
+        # 去重（避免重复添加已经作为龙头的股票）
+        leader_codes = set()
+        for _, stock in display_stocks:
+            leader_codes.add(str(stock['代码']))
+        
+        # 把all_sorted也转换成字典格式，保持一致
+        for _, row_row in all_sorted.iterrows():
+            # 转换成字典
+            stock_dict = {}
+            for col in all_sorted.columns:
+                val = row_row[col]
+                if hasattr(val, 'item'):
+                    try:
+                        val = val.item()
+                    except:
+                        pass
+                stock_dict[col] = val
+            
+            if str(stock_dict['代码']) not in leader_codes and len(display_stocks) < 8:
+                display_stocks.append(('', stock_dict))
+    
+    # 修复板块涨幅显示问题
+    sector_change = '--'
+    limit_up_count = 0
+    
+    try:
+        # 最简单的方法：直接从row取值，不管是什么类型，先转成字符串
+        val = row['涨幅']
+        sector_change = str(val)
+        
+        # 如果字符串中包含 % 符号，去掉不需要的部分
+        if 'Name:' in sector_change or 'dtype:' in sector_change:
+            # 如果是pandas Series的字符串表示，尝试提取数值
+            import re
+            match = re.search(r'([-+]?\d+\.?\d*%?)', sector_change)
+            if match:
+                sector_change = match.group(1)
+            else:
+                sector_change = '--'
+    except Exception as e:
+        print(f"  获取板块涨幅失败: {e}")
+        sector_change = '--'
+    
+    # 获取涨停数
+    try:
+        val = row.get('涨停数', row.get('涨停', 0))
+        limit_up_count = int(float(str(val).replace(',', '')))
+    except Exception as e:
+        limit_up_count = 0
+
+    sector_data.append({
+        'name': sector_name,
+        'change': sector_change,
+        'limit_up_count': limit_up_count,
+        'stocks': display_stocks,
+        'index': idx
+    })
+
+# 生成板块标签
+for sector in sector_data:
+    tab_change = sector['change']
+    html_content += f'''
+                <div class="sector-tab{' active' if sector['index'] == 1 else ''}" onclick="selectSector({sector['index'] - 1})">{sector['name']} <span style="color:#ff6b6b;">{tab_change}</span></div>
+'''
+
+html_content += '''
+            </div>
+            
+            <!-- 板块成分股面板 -->
+            <div class="sector-stock-panel" id="sectorStockPanel">
+'''
+
+# 生成所有板块的成分股数据
+for sector_idx, sector in enumerate(sector_data):
+    display_style = 'block' if sector_idx == 0 else 'none'
+    sector_change_display = sector['change']
+    
+    html_content += f'''
+                <div class="sector-panel" id="sectorPanel{sector_idx}" style="display: {display_style};">
+                    <div class="sector-panel-title">🔥 {sector['name']} - 板块涨幅：{sector_change_display} | 涨停数：{sector['limit_up_count']}</div>
+                    <div class="stock-grid">
+'''
+    for label, stock_row in sector['stocks']:
+        code, exchange, url = generate_stock_link(stock_row['代码'], stock_row['名称'])
+        stock_label = f"{label} {stock_row['名称']}" if label else stock_row['名称']
+        
+        # 直接获取股票涨幅
+        stock_change = '--'
+        try:
+            val = stock_row['涨幅']
+            stock_change = str(val)
+            
+            # 如果字符串中包含 Name: 等，尝试提取数值
+            if 'Name:' in stock_change or 'dtype:' in stock_change:
+                import re
+                match = re.search(r'([-+]?\d+\.?\d*%?)', stock_change)
+                if match:
+                    stock_change = match.group(1)
+                else:
+                    stock_change = '--'
+        except Exception as e:
+            stock_change = '--'
+        
+        # 添加特殊样式给龙头股
+        card_class = 'stock-card'
+        if '龙头' in label or '龙二' in label or '龙三' in label:
+            card_class = 'stock-card leader-card'
+        elif '中军' in label:
+            card_class = 'stock-card middle-card'
+        
+        html_content += f'''
+                        <div class="{card_class}">
+                            <div class="stock-card-header">
+                                <div class="stock-name">
+                                    <a class="stock-link" href="{url}" target="_blank">{stock_label}</a>
+                                    <div style="font-size: 13px; color: #888; margin-top: 4px;">({code})</div>
+                                </div>
+                                <div class="stock-change {'up' if parse_pct(stock_change) > 0 else 'down'}">{stock_change}</div>
+                            </div>
+                            <div class="stock-card-footer">
+                                <div style="color: #888; font-size: 13px;">{sector['name']}</div>
+                                <button class="add-btn" onclick="addToWatchlist('{code}', '{stock_row['名称']}', '{exchange}')">+自选</button>
+                            </div>
+                        </div>
+'''
+    html_content += '''
+                    </div>
+                </div>
+'''
+
+html_content += '''
+            </div>
+            
+            <div class="analysis-text" style="margin-top: 20px;">
+                <p><strong>💡 交易提示：</strong>板块强时买最强，分歧只切核心，不切跟风；龙头出来后别急着满仓，把钱留给龙回头。</p>
+            </div>
+        </div>
+        
+        <script>
+        // 板块切换功能
+        function selectSector(index) {
+            // 更新标签状态
+            const tabs = document.querySelectorAll('.sector-tab');
+            tabs.forEach((tab, idx) => {
+                tab.classList.toggle('active', idx === index);
+            });
+            
+            // 更新成分股显示
+            const panels = document.querySelectorAll('.sector-panel');
+            panels.forEach((panel, idx) => {
+                panel.style.display = idx === index ? 'block' : 'none';
+            });
+        }
+        </script>
+'''
+
+html_content += f'''
+        <!-- 07：推荐交易机会 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">07</span>
+                推荐交易机会
+            </h2>
+            <div class="analysis-text">
+                <h3 style="color:#ffd700;">🎯 交易体系执行清单</h3>
+                <p style="margin-bottom:10px;"><strong>第一步：大盘环境判断</strong></p>
+                <ul>
+                    <li>{market_strength == '弱势' and '❌ 大盘弱势，禁止追涨，不开新仓' or '✅ 大盘尚可，可谨慎操作'}</li>
+                    <li>{limit_down_count > 10 and '❌ 跌停家数较多，空仓观望' or '✅ 跌停家数正常，可轻仓试错'}</li>
+                    <li>涨跌比：{up_count/down_count:.2f}</li>
+                </ul>
+                
+                <p style="margin-top:15px;margin-bottom:10px;"><strong>第二步：板块选择</strong></p>
+                <ul>
+                    <li>今日领涨板块：{', '.join([row.板块名称 for _, row in sector_df_sorted.head(4).iterrows()])}</li>
+                    <li>✅ 板块强时买最强，优先关注龙头</li>
+                    <li>✅ 分歧只切核心，不切跟风</li>
+                </ul>
+                
+                <h3 style="color:#00d4ff;margin-top:20px;">🔥 核心关注标的</h3>
+'''
+
+# 新规则筛选核心关注标的
+# 规则：
+# 1. 从强势板块中选取（前4个强势板块）
+# 2. 去掉次新股
+# 3. 分清楚短线、中期、长期关注
+# 4. 前3个为主板，后面可以有2-3只创业板
+
+valid_strong_stocks = []
+selected_codes = set()
+
+# 第一步：从强势板块中收集股票
+sector_stocks_pool = []
+
+# 取前4个强势板块
+top_sectors = sector_df_sorted.head(4)
+
+for _, sector_row in top_sectors.iterrows():
+    sector_name = sector_row['板块名称']
+    # 获取该板块的成分股数据
+    if sector_name in sector_stock_data:
+        sector_stock_df = sector_stock_data[sector_name]
+        if len(sector_stock_df) > 0:
+            # 筛选该板块中的强势股（涨幅>5%）
+            for _, stock in sector_stock_df.iterrows():
+                # 先处理涨幅数值
+                if '涨跌幅数值' not in stock and '涨幅' in stock:
+                    try:
+                        change_str = str(stock['涨幅']).replace('%', '').strip()
+                        # 去除pandas Series格式问题
+                        if 'Name:' in change_str or 'dtype:' in change_str:
+                            import re
+                            match = re.search(r'([-+]?\d+\.?\d*)', change_str)
+                            if match:
+                                change_str = match.group(1)
+                        change_float = float(change_str)
+                        stock['涨跌幅数值'] = change_float
+                    except:
+                        stock['涨跌幅数值'] = 0
+                if '涨跌幅数值' in stock and stock['涨跌幅数值'] > 5:
+                    sector_stocks_pool.append(stock)
+
+# 第二步：筛选并分类
+all_valid_stocks = []
+for stock in sector_stocks_pool:
+    code_str = clean_code(stock['代码'])
+    # 排除科创板
+    if code_str.startswith('688'):
+        continue
+    # 排除次新股
+    is_new = False
+    if '上市日期' in stock:
+        is_new = safe_is_new_stock_for_risk(stock['上市日期'])
+    if is_new:
+        continue
+    # 排除ST
+    if is_st_stock(stock['名称']) or is_star_st_stock(stock['名称']):
+        continue
+    all_valid_stocks.append(stock)
+
+# 按涨幅排序
+all_valid_stocks = sorted(all_valid_stocks, key=lambda x: x['涨跌幅数值'] if '涨跌幅数值' in x else 0, reverse=True)
+
+# 分类：主板和创业板
+mainboard_stocks = []
+cyb_stocks = []
+for stock in all_valid_stocks:
+    code_str = clean_code(stock['代码'])
+    if is_mainboard_stock(code_str):
+        mainboard_stocks.append(stock)
+    elif is_cyb_stock(code_str):
+        cyb_stocks.append(stock)
+
+# 优先选择主板涨停的股票作为前三个
+mainboard_limit_up = [s for s in mainboard_stocks if is_limit_up(s['涨幅'])]
+mainboard_others = [s for s in mainboard_stocks if not is_limit_up(s['涨幅'])]
+
+# 填充前三个位置（龙头、龙二、中军）
+# 1. 龙头
+if len(mainboard_limit_up) > 0:
+    valid_strong_stocks.append(mainboard_limit_up[0])
+    selected_codes.add(str(mainboard_limit_up[0]['代码']))
+elif len(mainboard_others) > 0:
+    valid_strong_stocks.append(mainboard_others[0])
+    selected_codes.add(str(mainboard_others[0]['代码']))
+
+# 2. 龙二
+remaining_mainboard_for_2 = []
+for s in mainboard_limit_up:
+    if str(s['代码']) not in selected_codes:
+        remaining_mainboard_for_2.append(s)
+for s in mainboard_others:
+    if str(s['代码']) not in selected_codes:
+        remaining_mainboard_for_2.append(s)
+if len(remaining_mainboard_for_2) > 0 and len(valid_strong_stocks) < 2:
+    valid_strong_stocks.append(remaining_mainboard_for_2[0])
+    selected_codes.add(str(remaining_mainboard_for_2[0]['代码']))
+
+# 3. 中军
+remaining_mainboard_for_3 = []
+for s in mainboard_limit_up:
+    if str(s['代码']) not in selected_codes:
+        remaining_mainboard_for_3.append(s)
+for s in mainboard_others:
+    if str(s['代码']) not in selected_codes:
+        remaining_mainboard_for_3.append(s)
+if len(remaining_mainboard_for_3) > 0 and len(valid_strong_stocks) < 3:
+    valid_strong_stocks.append(remaining_mainboard_for_3[0])
+    selected_codes.add(str(remaining_mainboard_for_3[0]['代码']))
+
+# 现在填充剩下的位置，加入2-3只创业板，剩余主板
+# 添加创业板股票（最多3只）
+cyb_added = 0
+for s in cyb_stocks:
+    if str(s['代码']) not in selected_codes and cyb_added < 3 and len(valid_strong_stocks) < 8:
+        valid_strong_stocks.append(s)
+        selected_codes.add(str(s['代码']))
+        cyb_added += 1
+
+# 最后填充剩余的主板股票
+for s in mainboard_stocks:
+    if str(s['代码']) not in selected_codes and len(valid_strong_stocks) < 8:
+        valid_strong_stocks.append(s)
+        selected_codes.add(str(s['代码']))
+
+# 确保不超过8只
+valid_strong_stocks = valid_strong_stocks[:8]
+
+if len(valid_strong_stocks) > 0:
+    html_content += '''
+                <p><strong>【强势股池】</strong></p>
+                <table style="width:100%;margin-top:10px;">
+                    <tr>
+                        <th>排名</th>
+                        <th>股票</th>
+                        <th>涨幅</th>
+                        <th>概念</th>
+                        <th>关注周期</th>
+                        <th>风险排查</th>
+                        <th>操作</th>
+                    </tr>
+'''
+    for idx, stock in enumerate(valid_strong_stocks):
+        code, exchange, url = generate_stock_link(stock['代码'], stock['名称'])
+        rank_label = '👑 龙头' if idx == 0 else '🐲 龙二' if idx == 1 else '🐎 中军' if idx == 2 else '📈 强势'
+        
+        # 修复涨幅显示问题
+        stock_change = '--'
+        try:
+            val = stock['涨幅']
+            stock_change = str(val)
+            
+            # 如果字符串中包含 Name: 等，尝试提取数值
+            if 'Name:' in stock_change or 'dtype:' in stock_change:
+                import re
+                match = re.search(r'([-+]?\d+\.?\d*%?)', stock_change)
+                if match:
+                    stock_change = match.group(1)
+                else:
+                    stock_change = '--'
+        except Exception as e:
+            stock_change = '--'
+        
+        # 确定关注周期
+        # 前3个（龙头、龙二、中军）为短线关注
+        # 创业板的为中期关注
+        # 其他的为中期或长期
+        if idx < 3:
+            period_label = '⚡ 短线'
+        elif is_cyb_stock(code):
+            period_label = '📅 中期'
+        else:
+            period_label = '📅 中期'
+        
+        # 风险排查验证
+        is_st = is_st_stock(stock['名称']) or is_star_st_stock(stock['名称'])
+        is_688 = is_kcb_stock(stock['代码'])
+        is_new = safe_is_new_stock_for_risk(stock['上市日期']) if '上市日期' in stock else False
+        
+        risk_status = []
+        if is_st:
+            risk_status.append('🚫 退市风险')
+        if is_688:
+            risk_status.append('⚠️ 科创板')
+        if is_new:
+            risk_status.append('⚠️ 次新股')
+        
+        risk_display = '✅ 安全' if len(risk_status) == 0 else ' '.join(risk_status)
+        
+        html_content += f'''
+                    <tr>
+                        <td>{rank_label}</td>
+                        <td><a class="stock-link" href="{url}" target="_blank">{stock['名称']} ({code})</a></td>
+                        <td class="{ 'up' if parse_pct(stock_change) > 0 else 'down' if parse_pct(stock_change) < 0 else '' }">{stock_change}</td>
+                        <td>{stock['所属概念'][:30] if '所属概念' in stock and len(str(stock['所属概念'])) > 30 else (stock['所属概念'] if '所属概念' in stock else '')}</td>
+                        <td>{period_label}</td>
+                        <td>{risk_display}</td>
+                        <td><button class="add-btn" onclick="addToWatchlist('{code}', '{stock['名称']}', '{exchange}')">+自选</button></td>
+                    </tr>
+'''
+    html_content += '''
+                </table>
+'''
+
+html_content += f'''
+                <h3 style="color:#ffd700;margin-top:20px;">📋 具体交易策略</h3>
+                <p><strong>今日操作建议：</strong></p>
+                <ul>
+                    <li>🎯 仓位建议：{market_strength == '弱势' and '空仓或1成以内' or market_strength == '强势' and '5-7成' or '3-5成'}</li>
+                    <li>🎯 选股方向：今日强势板块龙头、百日新高个股</li>
+                    <li>🎯 买点原则：绿转红看承接，不追高</li>
+                    <li>🎯 卖点原则：高开无量先卖，炸板30分钟不回封走</li>
+                </ul>
+                
+                <h3 style="color:#ff4757;margin-top:20px;">⚠️ 今日特别风险提示</h3>
+                <ul>
+                    <li>⚠️ {market_strength == '弱势' and '严禁追高，空仓为主' or '谨慎追高，控制仓位'}</li>
+                    <li>⚠️ 今日跌停{limit_down_count}家，{limit_down_count > 10 and '注意情绪退潮' or '情绪尚可'}</li>
+                    <li>⚠️ 高位股注意风险，避免接盘</li>
+                    <li>⚠️ 严格执行止损纪律，不抱侥幸</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 08：风险提示 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">08</span>
+                风险提示
+            </h2>
+            <div class="analysis-text">
+                <h3 style="color:#ff4757;">⚠️ 今日市场风险（基于2026年6月4日最新消息）</h3>
+                <ul>
+                    <li><strong>缩量调整风险：</strong>上证指数跳空低开收跌0.64%，成交额1.27万亿较上日缩减1成以上，三大指数集体下跌，科创50是唯一上涨指数+0.69%。</li>
+                    <li><strong>个股普跌风险：</strong>全市场下跌4121家，上涨仅1344家，涨跌比约1:3，超4100股飘绿，市场做多情绪明显降温。</li>
+                    <li><strong>权重板块与题材板块双双杀跌风险：</strong>石油、酿酒、零售、食品饮料、有色、券商、医药等板块走低，仅有船舶、元器件、半导体、煤炭等少数板块逆市拉升。</li>
+                    <li><strong>明日方向选择风险：</strong>本周4个交易日两上两下，基本围绕60日均线震荡，明日或面临方向选择：要么跌穿120日均线向4000点逼近，要么反弹站上5日、10日均线收复4100点。</li>
+                    <li><strong>流动性边际收紧风险：</strong>全球流动性进入由宽松转向边际收紧的关键拐点，科技板块单边上行的顺畅行情难以延续，板块整体波动率放大，行情轮动加快。</li>
+                </ul>
+                
+                <h3 style="color:#ff9900;">🚫 规避板块与个股</h3>
+                <ul>
+                    <li>石油、酿酒、零售、食品饮料、有色、券商、医药等板块走低，暂时规避。</li>
+                    <li>近期涨幅过大的CPO、光模块等AI硬件方向，警惕高位回调风险。</li>
+                    <li>ST、*ST等高退市风险股票坚决规避！</li>
+                </ul>
+                
+                <h3 style="color:#2ed573;">🔍 个股风险排查验证（核心关注）</h3>
+                <ul>
+                    <li><strong>业绩风险：</strong>关注个股财报情况，避免买入连续亏损或业绩大幅下滑的公司。</li>
+                    <li><strong>解禁风险：</strong>注意大股东解禁时间，避免买入即将大额解禁的个股。</li>
+                    <li><strong>退市风险：</strong>避免ST、*ST等高风险个股，这类股票面临退市风险。</li>
+                    <li><strong>次新股风险：</strong>上市不足1年的次新股波动较大，建议谨慎参与。</li>
+                    <li><strong>科创板风险：</strong>科创板股票涨跌幅更大，波动更剧烈，适合风险承受能力较高的投资者。</li>
+                </ul>
+                
+                <h3 style="color:#1e90ff;">📌 操作建议</h3>
+                <ul>
+                    <li>仓位建议：适度控制仓位，激进型4-5成，稳健型2-3成，保守型1-2成或观望，等待明日方向明朗后再加大配置。</li>
+                    <li>选股方向：关注工业气体、玻璃基板、存储芯片、CPO概念等逆势活跃品种，以及船舶、元器件、半导体、煤炭等逆市拉升板块。</li>
+                    <li>买点原则：等待回调机会，不追高，关注明日指数方向选择，若站稳60日均线再考虑进场。</li>
+                    <li>卖点原则：持仓品种若跌破关键支撑位，果断止盈止损，严格控制回撤。</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 09：总结 -->
+        <div class="section">
+            <h2 class="section-title" style="display:flex;align-items:center;gap:15px;">
+                <span style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:8px 24px;border-radius:8px;font-size:1.3em;font-weight:bold;">09</span>
+                总结
+            </h2>
+            <div class="analysis-text">
+                <h3 style="color:#ffd700;">📊 市场总结</h3>
+                <p>今日市场{market_strength}，上涨{up_count}家，下跌{down_count}家，涨停{limit_up_count}家，跌停{limit_down_count}家，总成交额{total_amount/100000000:.1f}亿元。</p>
+                
+                <h3 style="color:#00d4ff;margin-top:15px;">🔥 板块总结</h3>
+                <p>今日领涨板块包括：{', '.join([row.板块名称 for _, row in sector_df_sorted.head(4).iterrows()])}</p>
+                
+                <h3 style="color:#2ed573;margin-top:15px;">👑 龙头总结</h3>
+                <p>重点关注各板块的龙头股表现，特别是有持续性的板块龙头。板块强时买最强，分歧只切核心，不切跟风。</p>
+                
+                <h3 style="color:#ffd700;margin-top:15px;">📝 交易计划</h3>
+                <p>• 仓位：{market_strength == '弱势' and '空仓或轻仓' or market_strength == '强势' and '适度加仓' or '保持中等仓位'}</p>
+                <p>• 关注方向：今日强势板块龙头、百日新高个股</p>
+                <p>• 禁忌：{market_strength == '弱势' and '不追涨、不开新仓' or '不追高、不碰弱势股'}</p>
+                
+                <h3 style="color:#00d4ff;margin-top:15px;">🔮 明日展望</h3>
+                <p>• 关注今日强势板块的持续性</p>
+                <p>• 关注龙头股的表现</p>
+                <p>• 关注成交量变化</p>
+                <p>• 严格执行交易纪律，控制风险</p>
+            </div>
+        </div>
+
+        <div class="footer" style="text-align: center; padding: 30px; color: #a0a0a0;">
+            <p>📈 投资有风险，入市需谨慎 | 本报告仅供参考，不构成投资建议</p>
+            <p>© 2026 A股复盘系统 | 数据来源：同花顺 | tushare</p>
+        </div>
+    </div>
+
+    <script>
+        const WATCHLIST_KEY = 'watchlist_''' + TRADE_DATE + '''';
+        let watchlist = [];
+        
+        // 初始化 - 确保DOM加载完成
+        document.addEventListener('DOMContentLoaded', function() {
+            loadWatchlist();
+        });
+        
+        function loadWatchlist() {
+            try {
+                const saved = localStorage.getItem(WATCHLIST_KEY);
+                if (saved) {
+                    watchlist = JSON.parse(saved);
+                }
+            } catch (e) {
+                console.error('加载自选股失败:', e);
+                watchlist = [];
+            }
+            updateWatchlistDisplay();
+        }
+        
+        function saveWatchlist() {
+            try {
+                localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist));
+            } catch (e) {
+                console.error('保存自选股失败:', e);
+            }
+            updateWatchlistDisplay();
+        }
+        
+        function addToWatchlist(code, name, exchange) {
+            try {
+                const exists = watchlist.find(s => s.code === code);
+                if (exists) {
+                    showToast('已在自选股中');
+                    return;
+                }
+                watchlist.push({ code, name, exchange });
+                saveWatchlist();
+                showToast('✓ 已添加到自选股: ' + name);
+            } catch (e) {
+                console.error('添加自选股失败:', e);
+                showToast('添加失败，请重试');
+            }
+        }
+        
+        function removeFromWatchlist(code) {
+            try {
+                watchlist = watchlist.filter(s => s.code !== code);
+                saveWatchlist();
+                showToast('已从自选股删除');
+            } catch (e) {
+                console.error('删除自选股失败:', e);
+                showToast('删除失败，请重试');
+            }
+        }
+        
+        function updateWatchlistDisplay() {
+            try {
+                const content = document.getElementById('watchlistContent');
+                const btn = document.querySelector('.watchlist-btn');
+                if (content) {
+                    if (watchlist.length === 0) {
+                        content.innerHTML = '<p style="color:#a0a0a0;">暂无自选股</p>';
+                    } else {
+                        content.innerHTML = watchlist.map(s => `
+                            <div class="watchlist-item">
+                                <a href="https://quote.eastmoney.com/${s.exchange}${s.code}.html" target="_blank" style="flex:1;">${s.name} (${s.code})</a>
+                                <button class="remove-btn" onclick="removeFromWatchlist('${s.code}')">删除</button>
+                            </div>
+                        `).join('');
+                    }
+                }
+                if (btn) {
+                    btn.textContent = `⭐ 自选股 (${watchlist.length})`;
+                }
+            } catch (e) {
+                console.error('更新自选股显示失败:', e);
+            }
+        }
+        
+        function toggleWatchlist() {
+            try {
+                const panel = document.getElementById('watchlistPanel');
+                if (panel) {
+                    panel.classList.toggle('show');
+                }
+            } catch (e) {
+                console.error('切换自选股面板失败:', e);
+            }
+        }
+        
+        function exportWatchlist() {
+            try {
+                if (watchlist.length === 0) {
+                    showToast('自选股为空');
+                    return;
+                }
+                let content = '自选股列表 - ''' + DISPLAY_DATE + '''\\n';
+                content += '='.repeat(40) + '\\n';
+                watchlist.forEach((s, idx) => {
+                    content += `${idx + 1}. ${s.name} (${s.code}) - https://quote.eastmoney.com/${s.exchange}${s.code}.html\\n`;
+                });
+                content += '='.repeat(40) + '\\n';
+                content += '导出时间：' + new Date().toLocaleString('zh-CN');
+                
+                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = '自选股_''' + TRADE_DATE + '''.txt';
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('✓ 导出成功');
+            } catch (e) {
+                console.error('导出失败:', e);
+                showToast('导出失败，请重试');
+            }
+        }
+        
+        function showToast(message) {
+            try {
+                const toast = document.getElementById('toast');
+                if (toast) {
+                    toast.textContent = message;
+                    toast.classList.add('show');
+                    setTimeout(() => {
+                        toast.classList.remove('show');
+                    }, 2500);
+                }
+            } catch (e) {
+                console.error('显示提示失败:', e);
+            }
+        }
+    </script>
+    </div><!-- end mainContent -->
+'''
+html_content += f'''    
+    <!-- 风险揭示 -->
+    <div class="risk-footer">
+        <h3>⚠️ 风险揭示与免责声明</h3>
+        <p>1. 本报告由AI自动生成，仅供学习参考，不构成任何投资建议。报告中的分析、判断和交易机会推荐均基于历史数据和算法模型，不代表未来表现。</p>
+        <p>2. 股市有风险，投资需谨慎。任何投资决策应基于个人独立判断，并咨询持牌专业投资顾问。过往业绩不预示未来收益。</p>
+        <p>3. 报告中提及的个股、板块、概念仅作为市场分析案例，不构成买入、卖出或持有建议。作者及相关方不对因使用本报告而产生的任何直接或间接损失承担责任。</p>
+        <p>4. 数据来源包括东方财富、Tushare等公开接口，AI花哥不保证数据的完整性、准确性和时效性。报告生成时间：{DISPLAY_DATE}。</p>
+        <p>5. 根据《证券投资顾问业务暂行规定》，本报告不属于证券投资顾问服务，不收取投资咨询费用。会员费用为技术服务和内容制作费用。</p>
+    </div>
+
+    <!-- 会员登录脚本 -->
+    <script>
+    let isRegisterMode = false;
+    function showError(msg) {{
+        const el = document.getElementById('loginError');
+        el.textContent = msg; el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 4000);
+    }}
+    function toggleMode() {{
+        isRegisterMode = !isRegisterMode;
+        const btn = document.querySelector('.login-box .btn');
+        const toggle = document.getElementById('modeToggle');
+        if (isRegisterMode) {{
+            btn.textContent = '注 册';
+            toggle.textContent = '已有账号？去登录';
+        }} else {{
+            btn.textContent = '登 录';
+            toggle.textContent = '注册新账号';
+        }}
+    }}
+    function handleLogin() {{
+        const email = document.getElementById('loginEmail').value.trim();
+        const pwd = document.getElementById('loginPassword').value.trim();
+        // 超级管理员 - 最高权限，适配所有模块
+        const SUPER_ADMIN = {{ email: '花哥', pwd: 'huage2026' }};
+        if (email === SUPER_ADMIN.email && pwd === SUPER_ADMIN.pwd) {{
+            localStorage.setItem('review_member', email);
+            localStorage.setItem('review_role', 'admin');
+            unlockContent();
+            return;
+        }}
+        if (!email || !email.includes('@') || !email.includes('.')) {{
+            showError('请输入有效的邮箱地址'); return;
+        }}
+        if (pwd.length < 6) {{
+            showError('密码至少6位'); return;
+        }}
+        try {{
+            const users = JSON.parse(localStorage.getItem('review_users') || '{{}}');
+            if (isRegisterMode) {{
+                if (users[email]) {{
+                    showError('该邮箱已注册，请直接登录'); return;
+                }}
+                users[email] = pwd;
+                localStorage.setItem('review_users', JSON.stringify(users));
+                localStorage.setItem('review_member', email);
+                unlockContent();
+            }} else {{
+                if (!users[email]) {{
+                    showError('账号不存在，请先注册'); return;
+                }}
+                if (users[email] !== pwd) {{
+                    showError('密码错误'); return;
+                }}
+                localStorage.setItem('review_member', email);
+                unlockContent();
+            }}
+        }} catch(e) {{ showError('系统错误，请重试'); }}
+    }}
+    function skipLogin() {{
+        document.getElementById('memberGate').classList.add('hidden');
+        document.getElementById('mainContent').classList.remove('blur-content');
+    }}
+    function unlockContent() {{
+        document.getElementById('memberGate').classList.add('hidden');
+        document.getElementById('mainContent').classList.remove('blur-content');
+    }}
+    (function() {{
+        try {{
+            if (localStorage.getItem('review_member')) unlockContent();
+        }} catch(e) {{}}
+    }})();
+    </script>
+</body>
+</html>'''
+
+# 写入文件
+with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+    f.write(html_content)
+
+print(f'✅ 报告生成成功：{OUTPUT_FILE}')
