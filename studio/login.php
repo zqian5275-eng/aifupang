@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($u['username'] === $username) { $u['last_login'] = date('Y-m-d H:i:s'); break; }
         }
         save_users($data);
-        $redirect = $_GET['redirect'] ?? 'index.php';
+        $redirect = $_GET['redirect'] ?? '/';
         header('Location: ' . $redirect);
         exit;
     }
